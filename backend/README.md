@@ -52,11 +52,20 @@ python test_api.py
 - `POST /api/auth/refresh/` - Refresh access token
 
 ### Expenses
-- `GET /api/expenses/` - List user's expenses
+- `GET /api/expenses/` - List user's expenses (supports filtering and search)
 - `POST /api/expenses/` - Create new expense
 - `GET /api/expenses/{id}/` - Get specific expense
 - `PUT /api/expenses/{id}/` - Update expense
 - `DELETE /api/expenses/{id}/` - Delete expense
+
+#### Filtering & Search Parameters:
+- `category` - Filter by category (FOOD, RENT, SALARY, SUPPLIES, OTHER)
+- `date_from` - Start date (YYYY-MM-DD)
+- `date_to` - End date (YYYY-MM-DD)
+- `min_amount` - Minimum amount
+- `max_amount` - Maximum amount
+- `search` - Search in title and description
+- `ordering` - Sort by date, amount, created_at, or title (prefix with `-` for descending)
 
 ### Analytics (New!)
 - `GET /api/expenses/dashboard/` - Dashboard summary (today, week, month stats)
@@ -155,6 +164,30 @@ curl -X GET http://127.0.0.1:8000/api/expenses/dashboard/ \
 ### Get Category Analytics
 ```bash
 curl -X GET http://127.0.0.1:8000/api/expenses/category_analytics/?days=30 \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### Filter Expenses by Category
+```bash
+curl -X GET "http://127.0.0.1:8000/api/expenses/?category=RENT" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### Filter by Date Range
+```bash
+curl -X GET "http://127.0.0.1:8000/api/expenses/?date_from=2024-01-01&date_to=2024-01-31" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### Search Expenses
+```bash
+curl -X GET "http://127.0.0.1:8000/api/expenses/?search=Office" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### Combined Filters
+```bash
+curl -X GET "http://127.0.0.1:8000/api/expenses/?category=RENT&min_amount=20000&ordering=-amount" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 

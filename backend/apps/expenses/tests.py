@@ -202,3 +202,89 @@ class ExpenseAnalyticsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('expenses', response.data)
         self.assertLessEqual(len(response.data['expenses']), 3)
+
+
+class ExpenseFilteringTests(APITestCase):
+    """Test the Expense filtering and search functionality."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass123',
+            email='test@example.com'
+        )
+        
+        # Create diverse test expenses
+        today = date.today()
+        
+        # Different categories
+        Expense.objects.create(user=self.user, title='Lunch', amount=Decimal('500'), category='FOOD', date=today)
+        Expense.objects.create(user=self.user, title='Office Rent', amount=Decimal('25000'), category='RENT', date=today - timedelta(days=5))
+        Expense.objects.create(user=self.user, title='Staff Salary', amount=Decimal('15000'), category='SALARY', date=today - timedelta(days=10))
+        Expense.objects.create(user=self.user, title='Office Supplies', amount=Decimal('2000'), category='SUPPLIES', date=today - timedelta(days=15))
+        Expense.objects.create(user=self.user, title='Misc Expense', amount=Decimal('1000'), category='OTHER', date=today - timedelta(days=20))
+
+    def test_filter_by_category(self):
+        """Test filtering by category."""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('expense-list')
+        
+        response = self.client.get(url, {'category': 'FOOD'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['category'], 'FOOD')
+
+    def test_filter_by_date_range(self):
+        """Test filtering by date range."""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('expense-list')
+        
+        today = date.today()
+        date_from = (today - timedelta(days=7)).isoformat()
+        date_to = today.isoformat()
+        
+        response = self.client.get(url, {'date_from': date_from, 'date_to': date_to})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 2)  # Lunch and Office Rent
+
+    def test_filter_by_amount_range(self):
+        """Test filtering by amount range."""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('expense-list')
+        
+        response = self.client.get(url, {'min_amount': 1000, 'max_amount': 5000})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 2)  # Office Supplies and Misc
+
+    def test_search_functionality(self):
+        """Test text search in title and description."""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('expense-list')
+        
+        response = self.client.get(url, {'search': 'Office'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 2)  # Office Rent and Office Supplies
+
+    def test_ordering(self):
+        """Test ordering by amount."""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('expense-list')
+        
+        response = self.client.get(url, {'ordering': '-amount'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertEqual(results[0]['title'], 'Office Rent')  # Highest amount
+        self.assertEqual(results[-1]['title'], 'Lunch')  # Lowest amount
+
+    def test_combined_filters(self):
+        """Test multiple filters combined."""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('expense-list')
+        
+        response = self.client.get(url, {
+            'min_amount': 10000,
+            'category': 'RENT'
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['title'], 'Office Rent')
