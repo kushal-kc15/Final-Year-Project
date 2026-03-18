@@ -40,8 +40,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # Custom middleware (will be added in Phase 3)
-    # 'apps.core.middleware.GlobalErrorHandlingMiddleware',
+    # Custom middleware
+    'apps.core.middleware.GlobalErrorHandlingMiddleware',
 ]
 
 ROOT_URLCONF = 'vyapar_margadarshan.urls'

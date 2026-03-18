@@ -1,4 +1,4 @@
 -r base.txt
-hypothesis>=6.92,<7.0
-factory-boy>=3.3,<4.0
-coverage>=7.3,<8.0
+
+# Development-specific packages
+django-debug-toolbar>=4.2,<5.0

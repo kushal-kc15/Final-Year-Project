@@ -1,9 +1,13 @@
 """
 Date helper utilities for BS (Bikram Sambat) and AD (Anno Domini) conversion.
-Placeholder implementation — will be completed in Phase 3 (Task 9).
 """
 
+import datetime
 import logging
+
+import nepali_datetime
+
+from .exceptions import DateConversionError
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +25,18 @@ def bs_to_ad(bs_year, bs_month, bs_day):
         tuple: (ad_year, ad_month, ad_day)
     
     Raises:
-        ValueError: If the BS date is invalid or out of supported range.
+        DateConversionError: If the BS date is invalid or out of supported range.
     """
-    # TODO: Implement full BS-to-AD conversion logic in Phase 3
-    raise NotImplementedError("BS to AD conversion will be implemented in Phase 3.")
+    try:
+        np_date = nepali_datetime.date(bs_year, bs_month, bs_day)
+        ad_date = np_date.to_datetime_date()
+        return ad_date.year, ad_date.month, ad_date.day
+    except ValueError as e:
+        logger.error(f"ValueError converting BS {bs_year}-{bs_month}-{bs_day} to AD: {e}")
+        raise DateConversionError(f"Invalid BS date: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error converting BS {bs_year}-{bs_month}-{bs_day} to AD: {e}")
+        raise DateConversionError(f"Failed to convert BS to AD: {e}")
 
 
 def ad_to_bs(ad_year, ad_month, ad_day):
@@ -40,7 +52,15 @@ def ad_to_bs(ad_year, ad_month, ad_day):
         tuple: (bs_year, bs_month, bs_day)
     
     Raises:
-        ValueError: If the AD date is invalid or out of supported range.
+        DateConversionError: If the AD date is invalid or out of supported range.
     """
-    # TODO: Implement full AD-to-BS conversion logic in Phase 3
-    raise NotImplementedError("AD to BS conversion will be implemented in Phase 3.")
+    try:
+        ad_date = datetime.date(ad_year, ad_month, ad_day)
+        np_date = nepali_datetime.date.from_datetime_date(ad_date)
+        return np_date.year, np_date.month, np_date.day
+    except ValueError as e:
+        logger.error(f"ValueError converting AD {ad_year}-{ad_month}-{ad_day} to BS: {e}")
+        raise DateConversionError(f"Invalid AD date: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error converting AD {ad_year}-{ad_month}-{ad_day} to BS: {e}")
+        raise DateConversionError(f"Failed to convert AD to BS: {e}")
