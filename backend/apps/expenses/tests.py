@@ -1,10 +1,11 @@
 import json
 from decimal import Decimal
+from datetime import date, timedelta
 
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APITestCase
 
 from apps.users.models import User
 from apps.expenses.models import Expense
@@ -137,3 +138,67 @@ class ExpensePropertyTests(TestCase):
         data = {'title': 'Zero', 'amount': '0.00', 'category': 'OTHER', 'date': '2024-01-01'}
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ExpenseAnalyticsTests(APITestCase):
+    """Test the Expense Analytics endpoints."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass123',
+            email='test@example.com'
+        )
+        
+        # Create test expenses
+        today = date.today()
+        for i in range(5):
+            Expense.objects.create(
+                user=self.user,
+                title=f'Test Expense {i}',
+                amount=Decimal(str(100 * (i + 1))),
+                category='FOOD',
+                date=today - timedelta(days=i)
+            )
+
+    def test_dashboard_endpoint(self):
+        """Test dashboard analytics endpoint."""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('expense-dashboard')
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('today', response.data)
+        self.assertIn('this_week', response.data)
+        self.assertIn('this_month', response.data)
+
+    def test_monthly_summary_endpoint(self):
+        """Test monthly summary analytics endpoint."""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('expense-monthly-summary')
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('total_amount', response.data)
+        self.assertIn('total_count', response.data)
+        self.assertIn('category_breakdown', response.data)
+
+    def test_category_analytics_endpoint(self):
+        """Test category analytics endpoint."""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('expense-category-analytics')
+        response = self.client.get(url, {'days': 30})
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('categories', response.data)
+        self.assertIn('total_amount', response.data)
+
+    def test_top_expenses_endpoint(self):
+        """Test top expenses endpoint."""
+        self.client.force_authenticate(user=self.user)
+        url = reverse('expense-top-expenses')
+        response = self.client.get(url, {'limit': 3})
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('expenses', response.data)
+        self.assertLessEqual(len(response.data['expenses']), 3)

@@ -58,6 +58,13 @@ python test_api.py
 - `PUT /api/expenses/{id}/` - Update expense
 - `DELETE /api/expenses/{id}/` - Delete expense
 
+### Analytics (New!)
+- `GET /api/expenses/dashboard/` - Dashboard summary (today, week, month stats)
+- `GET /api/expenses/monthly_summary/?year=2024&month=3` - Monthly expense summary
+- `GET /api/expenses/category_analytics/?days=30` - Category-wise breakdown
+- `GET /api/expenses/spending_trends/?days=90` - Weekly and monthly spending trends
+- `GET /api/expenses/top_expenses/?limit=10&days=30` - Top expenses by amount
+
 ## Project Structure
 
 ```
@@ -137,6 +144,18 @@ curl -X POST http://127.0.0.1:8000/api/expenses/ \
     "date": "2024-01-15",
     "description": "Monthly office rent payment"
   }'
+```
+
+### Get Dashboard Analytics
+```bash
+curl -X GET http://127.0.0.1:8000/api/expenses/dashboard/ \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### Get Category Analytics
+```bash
+curl -X GET http://127.0.0.1:8000/api/expenses/category_analytics/?days=30 \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
 ## Tech Stack
