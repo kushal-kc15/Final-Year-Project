@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>User Role Management - Vyapar Margadarshan</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "inverse-surface": "#233144",
+              "secondary-fixed-dim": "#b9c7df",
+              "secondary": "#515f74",
+              "on-surface-variant": "#444651",
+              "on-background": "#0d1c2f",
+              "background": "#f8f9ff",
+              "surface-tint": "#4059aa",
+              "surface-container-low": "#eff4ff",
+              "on-primary-container": "#90a8ff",
+              "on-tertiary-fixed": "#002113",
+              "surface": "#f8f9ff",
+              "on-tertiary-container": "#27c38a",
+              "error-container": "#ffdad6",
+              "surface-bright": "#f8f9ff",
+              "tertiary-fixed-dim": "#4edea3",
+              "on-primary-fixed-variant": "#264191",
+              "on-error-container": "#93000a",
+              "outline": "#757682",
+              "primary-container": "#1e3a8a",
+              "on-primary-fixed": "#00164e",
+              "surface-container-highest": "#d5e3fd",
+              "primary-fixed-dim": "#b6c4ff",
+              "on-secondary-container": "#57657a",
+              "on-secondary-fixed": "#0d1c2e",
+              "surface-container": "#e6eeff",
+              "secondary-container": "#d5e3fc",
+              "surface-dim": "#ccdbf4",
+              "tertiary": "#00311f",
+              "primary": "#00236f",
+              "tertiary-container": "#004a31",
+              "surface-container-high": "#dde9ff",
+              "secondary-fixed": "#d5e3fc",
+              "on-primary": "#ffffff",
+              "on-secondary-fixed-variant": "#3a485b",
+              "on-tertiary": "#ffffff",
+              "on-secondary": "#ffffff",
+              "error": "#ba1a1a",
+              "on-error": "#ffffff",
+              "on-surface": "#0d1c2f",
+              "outline-variant": "#c5c5d3",
+              "on-tertiary-fixed-variant": "#005236",
+              "surface-container-lowest": "#ffffff",
+              "inverse-primary": "#b6c4ff",
+              "inverse-on-surface": "#ebf1ff",
+              "tertiary-fixed": "#6ffbbe",
+              "surface-variant": "#d5e3fd",
+              "primary-fixed": "#dce1ff"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased">
+<!-- TopNavBar Execution -->
+<header class="sticky top-0 z-50 flex justify-between items-center w-full px-6 py-3 bg-[#f8f9ff] dark:bg-slate-950 font-['Inter'] font-semibold tracking-tight">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold text-[#00236f] dark:text-blue-400">Vyapar Margadarshan</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:bg-[#dde9ff] dark:hover:bg-slate-800 transition-colors px-3 py-1 rounded-lg" href="#">Dashboard</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:bg-[#dde9ff] dark:hover:bg-slate-800 transition-colors px-3 py-1 rounded-lg" href="#">Expenses</a>
+<a class="text-[#00236f] dark:text-blue-400 font-bold border-b-2 border-[#00236f] px-3 py-1" href="#">Settings</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm">search</span>
+<input class="bg-surface-container-low border-none rounded-full pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary w-64" placeholder="Search resources..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-secondary hover:bg-[#dde9ff] p-2 rounded-full transition-colors">notifications</button>
+<button class="material-symbols-outlined text-secondary hover:bg-[#dde9ff] p-2 rounded-full transition-colors">help</button>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="User profile avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBVuGV_vDjmkU3drJsdXEw5_Q6-Wp9Oqrhr3NE0Wp7IGkWN1G0iYpneY_KcgncpD95P4BfjJ6Y2Z_t386kpyzz3ipVSryh1GrLLp5hvbju_Rrzw4WeloT-AkR_msq1rIfcnuSVRNesBJCMKZglQlNS-raIA6QomWAFx8zz0S8CkoYO97PHc0j79xyrbbIyQ6tK_ZWJjis0aYVRQcTH6K4CbXiA3w0meeqGQIX5pW3nVEh2-Z3ihiIM5sMkcs5-wK-yRlMDQU6LMICa"/>
+</div>
+</div>
+</header>
+<div class="flex min-h-[calc(100-64px)]">
+<!-- SideNavBar Execution -->
+<aside class="fixed left-0 top-16 h-full flex flex-col pt-4 pb-8 z-40 w-64 bg-[#eff4ff] dark:bg-slate-900 border-r-0 font-['Inter'] text-sm font-medium tracking-wide">
+<div class="px-6 mb-8">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-on-primary font-bold">VG</div>
+<div>
+<div class="text-lg font-extrabold text-[#00236f] dark:text-blue-400">Vyapar Guide</div>
+<div class="text-[10px] uppercase tracking-widest text-secondary">SME Financials</div>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-6 py-3 text-slate-600 dark:text-slate-400 hover:text-[#00236f] hover:bg-[#dde9ff] dark:hover:bg-slate-800 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                    Dashboard
+                </a>
+<a class="flex items-center gap-3 px-6 py-3 text-slate-600 dark:text-slate-400 hover:text-[#00236f] hover:bg-[#dde9ff] dark:hover:bg-slate-800 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">payments</span>
+                    Expenses
+                </a>
+<a class="flex items-center gap-3 px-6 py-3 text-slate-600 dark:text-slate-400 hover:text-[#00236f] hover:bg-[#dde9ff] dark:hover:bg-slate-800 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">fact_check</span>
+                    Approvals
+                </a>
+<a class="flex items-center gap-3 px-6 py-3 text-slate-600 dark:text-slate-400 hover:text-[#00236f] hover:bg-[#dde9ff] dark:hover:bg-slate-800 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">analytics</span>
+                    Reports
+                </a>
+<a class="flex items-center gap-3 px-6 py-3 text-slate-600 dark:text-slate-400 hover:text-[#00236f] hover:bg-[#dde9ff] dark:hover:bg-slate-800 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">store</span>
+                    Vendors
+                </a>
+<a class="flex items-center gap-3 px-6 py-3 text-[#00236f] dark:text-blue-300 font-semibold border-l-4 border-[#00236f] bg-[#dde9ff]/50 dark:bg-blue-900/20" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+                    Settings
+                </a>
+</nav>
+<div class="mt-auto px-6 space-y-4">
+<button class="w-full flex items-center justify-center gap-2 bg-primary-container text-on-primary-container py-2 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-sm">group_add</span>
+                    Invite Team
+                </button>
+<div class="pt-4 border-t border-outline-variant/20 space-y-1">
+<a class="flex items-center gap-3 py-2 text-slate-600 hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">support_agent</span>
+                        Support
+                    </a>
+<a class="flex items-center gap-3 py-2 text-error hover:opacity-80 transition-colors" href="#">
+<span class="material-symbols-outlined">logout</span>
+                        Sign Out
+                    </a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 flex-1 p-8">
+<div class="max-w-6xl mx-auto">
+<!-- Header Section -->
+<div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div>
+<span class="text-sm font-bold uppercase tracking-widest text-primary mb-2 block">Settings</span>
+<h1 class="text-4xl font-bold tracking-tight text-on-surface">User Role Management</h1>
+<p class="text-on-surface-variant mt-2 text-lg">Define hierarchical access and control who can view or edit financial data.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-5 py-2.5 rounded-xl text-sm font-semibold text-on-surface bg-surface-container-high hover:bg-surface-container-highest transition-all">Export Log</button>
+<button class="px-5 py-2.5 rounded-xl text-sm font-semibold text-on-primary bg-gradient-to-r from-primary to-primary-container flex items-center gap-2 shadow-lg shadow-primary/10">
+<span class="material-symbols-outlined text-sm">add</span>
+                            Add New User
+                        </button>
+</div>
+</div>
+<!-- Roles Grid (Editorial Asymmetry) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+<!-- Owner Role Card -->
+<div class="bg-surface-container-lowest p-6 rounded-[1.5rem] shadow-sm flex flex-col relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-bl-full transition-transform group-hover:scale-110"></div>
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">admin_panel_settings</span>
+</div>
+<h3 class="font-bold text-xl">Owner</h3>
+</div>
+<p class="text-sm text-on-surface-variant mb-6 leading-relaxed">Full access to all modules, including organization billing and high-level financial strategy.</p>
+<div class="mt-auto flex items-center justify-between">
+<span class="text-xs font-bold text-primary px-3 py-1 bg-primary-fixed rounded-full">Primary Role</span>
+<button class="text-primary text-sm font-bold hover:underline">Edit Policy</button>
+</div>
+</div>
+<!-- Manager Role Card -->
+<div class="bg-surface-container-lowest p-6 rounded-[1.5rem] shadow-sm flex flex-col border-2 border-transparent hover:border-surface-container-high transition-all">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">manage_accounts</span>
+</div>
+<h3 class="font-bold text-xl">Manager</h3>
+</div>
+<p class="text-sm text-on-surface-variant mb-6 leading-relaxed">Can approve expenses and view department reports. Limited access to system settings.</p>
+<div class="mt-auto flex items-center justify-between">
+<span class="text-xs font-bold text-on-tertiary-container px-3 py-1 bg-tertiary-container/10 rounded-full">Operational</span>
+<button class="text-primary text-sm font-bold hover:underline">Edit Policy</button>
+</div>
+</div>
+<!-- Staff Role Card -->
+<div class="bg-surface-container-lowest p-6 rounded-[1.5rem] shadow-sm flex flex-col">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">badge</span>
+</div>
+<h3 class="font-bold text-xl">Staff</h3>
+</div>
+<p class="text-sm text-on-surface-variant mb-6 leading-relaxed">Data entry focused. Can add transactions but requires approval for all financial movements.</p>
+<div class="mt-auto flex items-center justify-between">
+<span class="text-xs font-bold text-secondary px-3 py-1 bg-surface-container-high rounded-full">Data Entry</span>
+<button class="text-primary text-sm font-bold hover:underline">Edit Policy</button>
+</div>
+</div>
+</div>
+<!-- Main Ledger Table -->
+<div class="bg-surface-container-lowest rounded-[1.5rem] overflow-hidden shadow-sm">
+<div class="p-6 flex justify-between items-center border-b border-surface-container-low">
+<h2 class="text-xl font-bold">Team Member Access</h2>
+<div class="flex gap-2">
+<button class="p-2 rounded-lg hover:bg-surface-container-low text-secondary">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+<button class="p-2 rounded-lg hover:bg-surface-container-low text-secondary">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">User Profile</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Role</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant text-center">Approve Expenses</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant text-center">View Reports</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant text-center">Add Transactions</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-low">
+<!-- User 1: Owner -->
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<img class="w-10 h-10 rounded-full" data-alt="Team member avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcGbC3Fhiy5azpM9onS0aXhVDeJAR78WT7yhtGwP6ZZxROaI-0QYtJgdw-DoOYU4Ls5l2ZObARBu0tOGf0ewVLT_HKmTgVFtZf72xnWj-sb0pb3g8lxqlUa545w7ZGgEFnWTk-s9t1BGYBjAMkclXAO4f6aAso1vFWmkequqh6mIDVTUMAF7GK_OxhfE2VYxdKLIejh9y6F1TOEhIQkakeYBONUGJiGdMF6PHGIMMhcLrAhGZB0qSczALuI3pObMoCoAjilLu3oSOl"/>
+<div>
+<div class="font-semibold text-on-surface">Arjun Mehta</div>
+<div class="text-xs text-on-surface-variant">arjun@vyaparm.com</div>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 rounded-full text-[11px] font-bold bg-primary text-on-primary">OWNER</span>
+</td>
+<td class="px-6 py-5 text-center">
+<div class="inline-flex items-center justify-center h-6 w-11 bg-primary rounded-full relative cursor-pointer opacity-50 pointer-events-none">
+<div class="absolute right-1 w-4 h-4 bg-white rounded-full"></div>
+</div>
+</td>
+<td class="px-6 py-5 text-center">
+<div class="inline-flex items-center justify-center h-6 w-11 bg-primary rounded-full relative cursor-pointer opacity-50 pointer-events-none">
+<div class="absolute right-1 w-4 h-4 bg-white rounded-full"></div>
+</div>
+</td>
+<td class="px-6 py-5 text-center">
+<div class="inline-flex items-center justify-center h-6 w-11 bg-primary rounded-full relative cursor-pointer opacity-50 pointer-events-none">
+<div class="absolute right-1 w-4 h-4 bg-white rounded-full"></div>
+</div>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="text-secondary hover:text-primary"><span class="material-symbols-outlined">edit</span></button>
+</td>
+</tr>
+<!-- User 2: Manager -->
+<tr class="bg-surface-container-low/20 hover:bg-surface-container-low/50 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<img class="w-10 h-10 rounded-full" data-alt="Team member avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2IVzLFhv-M2ADAWV-wqaPbRduPw7_iOiz7edWb5xZGrXC5WrFeq4ToY8m8uPhfd0XUa3rcdCirIzVtDycL7lcEH9Gpge8q8e9S_H084CX3pcZ8anIUHSc1QMWF3tVhE5qAiQ8OjE8WJKbackdsZX4OEVbSprwluLgJULOCrJoeIUBSUbOZXLS7feCn_AfzqWjWEC0O3LBuoto8103ja_K4Om1DYHjzH8nv9rAJFMOC7pUD13zWlxKltC4J0-FuR8T-sdaUl6qXsX_"/>
+<div>
+<div class="font-semibold text-on-surface">Priya Sharma</div>
+<div class="text-xs text-on-surface-variant">priya.s@vyaparm.com</div>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 rounded-full text-[11px] font-bold bg-surface-container-high text-primary">MANAGER</span>
+</td>
+<td class="px-6 py-5 text-center">
+<div class="inline-flex items-center justify-center h-6 w-11 bg-primary rounded-full relative cursor-pointer">
+<div class="absolute right-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+</div>
+</td>
+<td class="px-6 py-5 text-center">
+<div class="inline-flex items-center justify-center h-6 w-11 bg-primary rounded-full relative cursor-pointer">
+<div class="absolute right-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+</div>
+</td>
+<td class="px-6 py-5 text-center">
+<div class="inline-flex items-center justify-center h-6 w-11 bg-outline-variant rounded-full relative cursor-pointer">
+<div class="absolute left-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+</div>
+</td>
+<td class="px-6 py-5 text-right text-secondary hover:text-primary">
+<button><span class="material-symbols-outlined">edit</span></button>
+</td>
+</tr>
+<!-- User 3: Staff -->
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<img class="w-10 h-10 rounded-full" data-alt="Team member avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCe4ZY-ZOkuTimhGZd1gvZbyY33hKmE8HskgQ0gu9QYjEcobLF4lEx9bq6kkpaSTwBQfqKUqiu08SLp3_2IKb5tomLPbbrdnKc0iEjhLuUFbY7v5t2MTQfXlrIblLZAxxY084JADY1cmk_Z_3lQYhKPNAWJUigTft_mLqvRGYEfcsnCXtBraKw0d15-tijRF0m3frHatSNxn6qZNFSaUXhbkMe7uUcUoPedKT-WcySQ4f5U1J0sulVKLa5RMao1nlZz71cCVWQ17Q6K"/>
+<div>
+<div class="font-semibold text-on-surface">Rohan Das</div>
+<div class="text-xs text-on-surface-variant">rohan.d@vyaparm.com</div>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 rounded-full text-[11px] font-bold bg-surface-container-low text-secondary">STAFF</span>
+</td>
+<td class="px-6 py-5 text-center">
+<div class="inline-flex items-center justify-center h-6 w-11 bg-outline-variant rounded-full relative cursor-pointer">
+<div class="absolute left-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+</div>
+</td>
+<td class="px-6 py-5 text-center">
+<div class="inline-flex items-center justify-center h-6 w-11 bg-outline-variant rounded-full relative cursor-pointer">
+<div class="absolute left-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+</div>
+</td>
+<td class="px-6 py-5 text-center">
+<div class="inline-flex items-center justify-center h-6 w-11 bg-primary rounded-full relative cursor-pointer">
+<div class="absolute right-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+</div>
+</td>
+<td class="px-6 py-5 text-right text-secondary hover:text-primary">
+<button><span class="material-symbols-outlined">edit</span></button>
+</td>
+</tr>
+<!-- User 4: Staff -->
+<tr class="bg-surface-container-low/20 hover:bg-surface-container-low/50 transition-colors">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<img class="w-10 h-10 rounded-full" data-alt="Team member avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtojntAffcwjcgbw41B4k7K3o0mHvg18K8Cv1u4No6uNStOk-k_MhjinIB4AkvWdvEUv_hRD7Y-7kdzkplqkNn_XbRtEmVoIYVhYLGBIhXmliaGtdZAiwxkbGKSqjo0cwOJjMgoP5rIUcAONK-eqSu6YvbW3FiODZ0zdpm662UYtOwzMW6qP_hcCME5sZSOLiUqMSva2R8XogQW3W07GQ-wjG-auLF2vjIVlt4WJOgcoTFo6zVP8DbHzegpMFVjk2J4GA2eiuApbXt"/>
+<div>
+<div class="font-semibold text-on-surface">Sara Khan</div>
+<div class="text-xs text-on-surface-variant">sara.k@vyaparm.com</div>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="px-3 py-1 rounded-full text-[11px] font-bold bg-surface-container-low text-secondary">STAFF</span>
+</td>
+<td class="px-6 py-5 text-center">
+<div class="inline-flex items-center justify-center h-6 w-11 bg-outline-variant rounded-full relative cursor-pointer">
+<div class="absolute left-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+</div>
+</td>
+<td class="px-6 py-5 text-center">
+<div class="inline-flex items-center justify-center h-6 w-11 bg-outline-variant rounded-full relative cursor-pointer">
+<div class="absolute left-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+</div>
+</td>
+<td class="px-6 py-5 text-center">
+<div class="inline-flex items-center justify-center h-6 w-11 bg-primary rounded-full relative cursor-pointer">
+<div class="absolute right-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+</div>
+</td>
+<td class="px-6 py-5 text-right text-secondary hover:text-primary">
+<button><span class="material-symbols-outlined">edit</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-6 border-t border-surface-container-low flex items-center justify-between">
+<div class="text-sm text-on-surface-variant">Showing <span class="font-semibold text-on-surface">4</span> of <span class="font-semibold text-on-surface">12</span> team members</div>
+<div class="flex gap-2">
+<button class="px-4 py-2 rounded-xl text-sm font-semibold bg-surface-container-high text-on-surface opacity-50 cursor-not-allowed">Previous</button>
+<button class="px-4 py-2 rounded-xl text-sm font-semibold bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors">Next</button>
+</div>
+</div>
+</div>
+<!-- Footer Context Info -->
+<div class="mt-12 p-8 bg-tertiary-container/5 rounded-[1.5rem] border border-tertiary-container/10 flex items-start gap-6">
+<div class="w-12 h-12 rounded-full bg-tertiary-container flex items-center justify-center text-on-tertiary-container shrink-0">
+<span class="material-symbols-outlined">shield</span>
+</div>
+<div>
+<h4 class="font-bold text-lg text-tertiary-container">Data Privacy &amp; Compliance</h4>
+<p class="text-on-surface-variant mt-1 leading-relaxed max-w-2xl">
+                            All role modifications are logged in the <strong>Audit Trail</strong>. Users will receive an automated notification via email when their permissions or roles are adjusted. For security, changing an "Owner" role requires dual-factor authentication from all current owners.
+                        </p>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Activity Center | Vyapar Margadarshan</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-variant": "#d5e3fd",
+                        "primary": "#00236f",
+                        "on-secondary": "#ffffff",
+                        "secondary": "#515f74",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "primary-fixed": "#dce1ff",
+                        "primary-fixed-dim": "#b6c4ff",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "surface-dim": "#ccdbf4",
+                        "secondary-fixed": "#d5e3fc",
+                        "inverse-surface": "#233144",
+                        "on-secondary-container": "#57657a",
+                        "on-surface": "#0d1c2f",
+                        "inverse-primary": "#b6c4ff",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "on-primary": "#ffffff",
+                        "surface-container-high": "#dde9ff",
+                        "on-background": "#0d1c2f",
+                        "surface-bright": "#f8f9ff",
+                        "on-tertiary-container": "#27c38a",
+                        "surface-tint": "#4059aa",
+                        "tertiary-container": "#004a31",
+                        "on-tertiary-fixed": "#002113",
+                        "surface-container-low": "#eff4ff",
+                        "on-primary-container": "#90a8ff",
+                        "background": "#f8f9ff",
+                        "surface": "#f8f9ff",
+                        "on-primary-fixed-variant": "#264191",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-container": "#d5e3fc",
+                        "surface-container": "#e6eeff",
+                        "error-container": "#ffdad6",
+                        "surface-container-highest": "#d5e3fd",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "on-error": "#ffffff",
+                        "inverse-on-surface": "#ebf1ff",
+                        "tertiary-fixed": "#6ffbbe",
+                        "outline-variant": "#c5c5d3",
+                        "on-tertiary": "#ffffff",
+                        "primary-container": "#1e3a8a",
+                        "on-surface-variant": "#444651",
+                        "on-error-container": "#93000a",
+                        "outline": "#757682",
+                        "on-primary-fixed": "#00164e",
+                        "error": "#ba1a1a",
+                        "tertiary": "#00311f"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased">
+<!-- SideNavBar (Shared Component) -->
+<aside class="fixed left-0 top-0 h-full flex flex-col py-6 bg-slate-100 dark:bg-slate-950 h-screen w-64 border-r-0 z-40 hidden md:flex">
+<div class="px-6 mb-10 flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+</div>
+<div>
+<h1 class="text-lg font-bold text-blue-900 dark:text-white leading-none">Vyapar</h1>
+<p class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">SME Management</p>
+</div>
+</div>
+<nav class="flex-1 px-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-blue-800 hover:bg-slate-200 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-medium text-sm">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-blue-800 hover:bg-slate-200 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="assessment">assessment</span>
+<span class="font-medium text-sm">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-blue-800 hover:bg-slate-200 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-medium text-sm">Vendors</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 dark:text-slate-400 hover:text-blue-800 hover:bg-slate-200 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-medium text-sm">Budgets</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg border-l-4 border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10 font-semibold transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="font-medium text-sm">Activity Center</span>
+</a>
+</nav>
+<div class="px-4 mt-auto space-y-1">
+<button class="w-full bg-gradient-to-r from-primary to-primary-container text-white py-3 rounded-xl font-semibold text-sm mb-6 flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+                Add Transaction
+            </button>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-500 hover:text-blue-900 text-xs uppercase tracking-widest font-bold" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="help">help</span>
+                Help Center
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-500 hover:text-error text-xs uppercase tracking-widest font-bold" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="logout">logout</span>
+                Logout
+            </a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="md:ml-64 min-h-screen flex flex-col">
+<!-- TopAppBar (Shared Component) -->
+<header class="sticky top-0 z-50 flex justify-between items-center px-8 py-4 w-full bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl">
+<div class="flex items-center gap-8">
+<h2 class="text-xl font-bold text-blue-900 dark:text-white tracking-tight font-headline">Activity Center</h2>
+<div class="hidden lg:flex items-center bg-surface-container-low px-4 py-2 rounded-full w-96">
+<span class="material-symbols-outlined text-slate-400 mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-full placeholder-slate-400" placeholder="Search alerts or logs..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-500 hover:bg-blue-50 rounded-full transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="p-2 text-slate-500 hover:bg-blue-50 rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-primary/10">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="Corporate user profile avatar minimalist" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQEPZWcJeq2RnylT2Co6IiB9V8Qw7uJAgDbu3fnmqY0oXhmIkc4QPnZ35LFDUwaU4kfGFfBD7uBKizyH_eGphqBNnuOc1VSSbdQf_Pm-ym9et7R6XGnwQbYGn3vZI5byxzfcOcgLFu-flnjX6W_RDB3UDaLH5eO2EmJwtiftSpqa4Q_QcouSoX1SXqVaeUs3pQgfjWag2hROvUMtiSt-AiDtGDS-HVQGl5lZrcohd1KyTBZdG4o7J9HEvZb0ZgRHUttUD2lqhwW8z8"/>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="p-8 space-y-10">
+<!-- Bento Header Section -->
+<section class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Status Card -->
+<div class="md:col-span-8 bg-surface-container-lowest p-8 rounded-xl shadow-sm relative overflow-hidden flex flex-col justify-between">
+<div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-20 -mt-20"></div>
+<div class="relative z-10">
+<span class="label-sm text-on-surface-variant font-bold tracking-widest uppercase mb-2 block">Account Summary</span>
+<h3 class="text-3xl font-bold tracking-tight text-primary mb-2">Systems Operational</h3>
+<p class="text-secondary max-w-md">Your smart advisor is currently monitoring 42 active data streams. No critical security threats identified in the last 24 hours.</p>
+</div>
+<div class="flex gap-4 mt-6">
+<div class="flex items-center gap-2 bg-tertiary-container px-3 py-1.5 rounded-lg">
+<span class="w-2 h-2 rounded-full bg-tertiary-fixed-dim animate-pulse"></span>
+<span class="text-xs font-bold text-on-tertiary-container uppercase tracking-wide">Live Feed</span>
+</div>
+<div class="flex items-center gap-2 bg-surface-container-high px-3 py-1.5 rounded-lg">
+<span class="text-xs font-bold text-primary uppercase tracking-wide">12 New Notifications</span>
+</div>
+</div>
+</div>
+<!-- Quick Stats -->
+<div class="md:col-span-4 space-y-4">
+<div class="bg-primary-container text-white p-6 rounded-xl flex items-center justify-between">
+<div>
+<p class="text-primary-fixed-dim text-xs font-bold uppercase tracking-widest mb-1">Advisor Hits</p>
+<p class="text-2xl font-bold">128</p>
+</div>
+<span class="material-symbols-outlined text-4xl opacity-30" data-icon="psychology">psychology</span>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl border-l-4 border-tertiary-fixed-dim flex items-center justify-between">
+<div>
+<p class="text-on-surface-variant text-xs font-bold uppercase tracking-widest mb-1">Audit Score</p>
+<p class="text-2xl font-bold text-on-surface">98.4%</p>
+</div>
+<span class="material-symbols-outlined text-4xl text-tertiary-fixed-dim" data-icon="verified_user">verified_user</span>
+</div>
+</div>
+</section>
+<!-- Notification Feed & Filters -->
+<section class="space-y-6">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<h4 class="text-xl font-bold text-primary tracking-tight">Recent Activity</h4>
+<div class="flex flex-wrap items-center gap-2">
+<button class="px-4 py-2 rounded-full text-sm font-semibold bg-primary text-white shadow-md">All Activity</button>
+<button class="px-4 py-2 rounded-full text-sm font-semibold bg-surface-container-low text-secondary hover:bg-surface-container-high transition-colors">Smart Advisor</button>
+<button class="px-4 py-2 rounded-full text-sm font-semibold bg-surface-container-low text-secondary hover:bg-surface-container-high transition-colors">Transactions</button>
+<button class="px-4 py-2 rounded-full text-sm font-semibold bg-surface-container-low text-secondary hover:bg-surface-container-high transition-colors">System</button>
+</div>
+</div>
+<!-- Feed Layout: Asymmetric Column -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Primary Alerts Feed -->
+<div class="lg:col-span-2 space-y-4">
+<!-- Alert Item 1: Smart Advisor -->
+<div class="group bg-surface-container-lowest p-6 rounded-xl flex gap-6 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 relative">
+<div class="w-12 h-12 rounded-xl bg-primary-container flex-shrink-0 flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold text-primary uppercase tracking-widest">Smart Advisor</span>
+<span class="text-xs text-slate-400">12m ago</span>
+</div>
+<h5 class="font-bold text-on-surface text-lg mb-1 leading-tight">Unusual spending detected at AWS</h5>
+<p class="text-secondary text-sm mb-4 leading-relaxed">Infrastructure costs spiked by 42% compared to the previous Tuesday. This might be due to a new deployment or unoptimized resource allocation.</p>
+<div class="flex gap-3">
+<button class="text-xs font-bold px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">View Transaction</button>
+<button class="text-xs font-bold px-4 py-2 text-primary border border-primary/10 rounded-lg hover:bg-primary/5 transition-colors">Mute Source</button>
+</div>
+</div>
+<div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-slate-300" data-icon="chevron_right">chevron_right</span>
+</div>
+</div>
+<!-- Alert Item 2: System -->
+<div class="group bg-surface-container-lowest p-6 rounded-xl flex gap-6 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 border-l-4 border-tertiary-fixed-dim">
+<div class="w-12 h-12 rounded-xl bg-tertiary-container flex-shrink-0 flex items-center justify-center text-tertiary-fixed-dim">
+<span class="material-symbols-outlined" data-icon="target">target</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold text-tertiary-fixed-dim uppercase tracking-widest">System Update</span>
+<span class="text-xs text-slate-400">2h ago</span>
+</div>
+<h5 class="font-bold text-on-surface text-lg mb-1 leading-tight">New budget limit set for Marketing</h5>
+<p class="text-secondary text-sm mb-4 leading-relaxed">The Q4 Marketing allocation has been adjusted to $45,000. Approval granted by Admin.</p>
+<div class="flex gap-3">
+<button class="text-xs font-bold px-4 py-2 bg-surface-container-high text-on-surface rounded-lg hover:bg-surface-container-highest transition-colors">Resolve</button>
+</div>
+</div>
+</div>
+<!-- Alert Item 3: Transaction -->
+<div class="group bg-surface-container-lowest p-6 rounded-xl flex gap-6 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
+<div class="w-12 h-12 rounded-xl bg-secondary-container flex-shrink-0 flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold text-secondary-container uppercase tracking-widest text-slate-600">Transaction</span>
+<span class="text-xs text-slate-400">5h ago</span>
+</div>
+<h5 class="font-bold text-on-surface text-lg mb-1 leading-tight">Pending Approval: Vendor Payout</h5>
+<p class="text-secondary text-sm mb-4 leading-relaxed">Payment of $2,400 to 'Zyla Creative Solutions' is awaiting your final verification.</p>
+<div class="flex gap-3">
+<button class="text-xs font-bold px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">Approve Now</button>
+<button class="text-xs font-bold px-4 py-2 text-error bg-error-container rounded-lg hover:opacity-90 transition-opacity">Decline</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Side Column: Audit Log -->
+<div class="space-y-6">
+<div class="bg-surface-container-low p-6 rounded-xl h-fit">
+<div class="flex items-center justify-between mb-6">
+<h4 class="font-bold text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-lg" data-icon="history">history</span>
+                                    Audit Log
+                                </h4>
+<button class="text-[10px] font-bold text-primary uppercase underline">Export CSV</button>
+</div>
+<div class="space-y-6 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-primary/10">
+<!-- Log Item -->
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 w-6 h-6 rounded-full bg-white border-2 border-primary-fixed-dim flex items-center justify-center">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+<p class="text-sm font-bold text-on-surface">Admin Login</p>
+<p class="text-xs text-secondary">IP: 192.168.1.1 (Mumbai, IN)</p>
+<p class="text-[10px] text-slate-400 font-medium mt-1 uppercase">Today, 09:15 AM</p>
+</div>
+<!-- Log Item -->
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 w-6 h-6 rounded-full bg-white border-2 border-primary-fixed-dim flex items-center justify-center">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+<p class="text-sm font-bold text-on-surface">Currency Pref Changed</p>
+<p class="text-xs text-secondary">Updated to INR (₹) by User 02</p>
+<p class="text-[10px] text-slate-400 font-medium mt-1 uppercase">Oct 24, 11:30 PM</p>
+</div>
+<!-- Log Item -->
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 w-6 h-6 rounded-full bg-white border-2 border-primary-fixed-dim flex items-center justify-center">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+<p class="text-sm font-bold text-on-surface">API Key Rotated</p>
+<p class="text-xs text-secondary">Production key auto-refresh</p>
+<p class="text-[10px] text-slate-400 font-medium mt-1 uppercase">Oct 23, 04:45 AM</p>
+</div>
+<!-- Log Item -->
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 w-6 h-6 rounded-full bg-white border-2 border-primary-fixed-dim flex items-center justify-center">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+<p class="text-sm font-bold text-on-surface">System Backup</p>
+<p class="text-xs text-secondary">Manual snapshot 'Oct_Final'</p>
+<p class="text-[10px] text-slate-400 font-medium mt-1 uppercase">Oct 22, 12:00 PM</p>
+</div>
+</div>
+<button class="w-full mt-8 py-3 text-xs font-bold text-slate-500 bg-surface-container-lowest rounded-lg hover:bg-white border border-transparent hover:border-primary/10 transition-all uppercase tracking-widest">
+                                Load Full Audit History
+                            </button>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Footer (Shared Component) -->
+<footer class="w-full px-8 py-12 flex flex-col md:flex-row justify-between items-center bg-white dark:bg-slate-950 mt-auto">
+<p class="font-inter text-xs uppercase tracking-widest text-slate-500">© 2024 Vyapar Margadarshan. All rights reserved.</p>
+<div class="flex gap-8 mt-6 md:mt-0">
+<a class="font-inter text-xs uppercase tracking-widest text-slate-500 hover:text-blue-600 transition-colors" href="#">Privacy Policy</a>
+<a class="font-inter text-xs uppercase tracking-widest text-slate-500 hover:text-blue-600 transition-colors" href="#">Terms of Service</a>
+<a class="font-inter text-xs uppercase tracking-widest text-slate-500 hover:text-blue-600 transition-colors" href="#">Contact Support</a>
+</div>
+</footer>
+</main>
+<!-- Mobile Bottom NavBar (Shared Component) -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-slate-50/90 backdrop-blur-xl flex justify-around items-center py-3 px-4 z-50 shadow-2xl">
+<a class="flex flex-col items-center gap-1 text-slate-500" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="text-[10px] font-bold">Dash</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-500" href="#">
+<span class="material-symbols-outlined" data-icon="assessment">assessment</span>
+<span class="text-[10px] font-bold">Reports</span>
+</a>
+<div class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white -mt-8 shadow-lg">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</div>
+<a class="flex flex-col items-center gap-1 text-blue-900" href="#">
+<span class="material-symbols-outlined" data-icon="notifications" style="font-variation-settings: 'FILL' 1;">notifications</span>
+<span class="text-[10px] font-bold">Alerts</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-500" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-[10px] font-bold">Settings</span>
+</a>
+</nav>
+</body></html>

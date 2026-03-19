@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Vyapar Margadarshan - Empower Your Vyapar</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-secondary": "#ffffff",
+              "on-tertiary-fixed-variant": "#005236",
+              "surface-container": "#e6eeff",
+              "on-secondary-container": "#57657a",
+              "on-secondary-fixed": "#0d1c2e",
+              "inverse-on-surface": "#ebf1ff",
+              "surface-container-highest": "#d5e3fd",
+              "on-secondary-fixed-variant": "#3a485b",
+              "surface-tint": "#4059aa",
+              "secondary": "#515f74",
+              "inverse-surface": "#233144",
+              "surface-dim": "#ccdbf4",
+              "primary-container": "#1e3a8a",
+              "on-tertiary-fixed": "#002113",
+              "on-tertiary-container": "#27c38a",
+              "tertiary-fixed-dim": "#4edea3",
+              "on-primary": "#ffffff",
+              "tertiary-container": "#004a31",
+              "surface-variant": "#d5e3fd",
+              "on-surface": "#0d1c2f",
+              "surface-container-lowest": "#ffffff",
+              "surface": "#f8f9ff",
+              "surface-container-low": "#eff4ff",
+              "error": "#ba1a1a",
+              "surface-bright": "#f8f9ff",
+              "primary-fixed": "#dce1ff",
+              "on-surface-variant": "#444651",
+              "primary": "#00236f",
+              "on-tertiary": "#ffffff",
+              "secondary-container": "#d5e3fc",
+              "surface-container-high": "#dde9ff",
+              "primary-fixed-dim": "#b6c4ff",
+              "tertiary-fixed": "#6ffbbe",
+              "outline-variant": "#c5c5d3",
+              "error-container": "#ffdad6",
+              "on-error-container": "#93000a",
+              "inverse-primary": "#b6c4ff",
+              "outline": "#757682",
+              "tertiary": "#00311f",
+              "on-primary-fixed": "#00164e",
+              "on-primary-fixed-variant": "#264191",
+              "on-background": "#0d1c2f",
+              "on-error": "#ffffff",
+              "secondary-fixed": "#d5e3fc",
+              "secondary-fixed-dim": "#b9c7df",
+              "on-primary-container": "#90a8ff",
+              "background": "#f8f9ff"
+            },
+            fontFamily: {
+              "headline": ["Inter", "sans-serif"],
+              "body": ["Inter", "sans-serif"],
+              "label": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "1rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-nav {
+        backdrop-filter: blur(12px);
+      }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- TopNavBar -->
+<nav class="sticky top-0 z-50 flex justify-between items-center px-6 py-3 w-full bg-slate-50/80 backdrop-blur-xl font-inter tracking-tight">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold text-blue-900">Vyapar Margadarshan</span>
+<div class="hidden md:flex gap-6 items-center">
+<a class="text-blue-900 font-semibold hover:bg-blue-50 transition-colors px-3 py-1.5 rounded-lg" href="#">Dashboard</a>
+<a class="text-slate-500 hover:bg-blue-50 transition-colors px-3 py-1.5 rounded-lg" href="#">Product</a>
+<a class="text-slate-500 hover:bg-blue-50 transition-colors px-3 py-1.5 rounded-lg" href="#">Pricing</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+<input class="pl-10 pr-4 py-2 bg-slate-100 border-none rounded-full text-sm focus:ring-2 focus:ring-primary-container w-64" placeholder="Search insights..." type="text"/>
+</div>
+<button class="p-2 text-slate-500 hover:bg-blue-50 transition-colors rounded-full">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-slate-500 hover:bg-blue-50 transition-colors rounded-full">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="Professional user profile headshot" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAadZgHkEM7Ct6u1jBW5TOZQ79Md8zCHQUUugnbmtP-DMMP76C2sG2k-I5OzvKWNheszmsj9SGLjHhuGGLGp51K60mHVC88EjyOcciF_XT6psMouwypr5PjSB6MDhDpTsf4O4fKZ023-CmSqZREkIZARi6XY951EKNd07QAOAYE1GL9YKPRU33w8SCWaJMkiNm16Z2w-tX_rmVXG9UAvegAyV5nycRao6975CrnQrfuiFGTEWc6iRyfMe19unqCUq6IWv1Xoco8Huyw"/>
+</div>
+</div>
+</nav>
+<main>
+<!-- Hero Section -->
+<section class="relative pt-24 pb-32 px-6 overflow-hidden">
+<div class="max-w-7xl mx-auto flex flex-col items-center text-center relative z-10">
+<div class="inline-flex items-center px-4 py-1.5 rounded-full bg-surface-container-high text-primary font-medium text-xs uppercase tracking-widest mb-8">
+                    Smart SME Management
+                </div>
+<h1 class="text-5xl md:text-7xl font-extrabold text-on-surface tracking-tight leading-tight max-w-4xl mb-8">
+                    Empower Your Vyapar with <span class="bg-gradient-to-r from-primary to-primary-container bg-clip-text text-transparent">Smart Guidance.</span>
+</h1>
+<p class="text-xl text-on-surface-variant max-w-2xl mb-12 leading-relaxed">
+                    Transform your business data into actionable intelligence. Vyapar Margadarshan provides high-end financial oversight designed for modern growth.
+                </p>
+<div class="flex flex-col sm:flex-row gap-6">
+<button class="px-8 py-4 bg-gradient-to-br from-primary to-primary-container text-white font-semibold rounded-xl hover:shadow-xl transition-all transform active:scale-95">
+                        Get Started
+                    </button>
+<button class="px-8 py-4 bg-surface-container-high text-on-surface font-semibold rounded-xl hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="play_circle">play_circle</span>
+                        Watch Demo
+                    </button>
+</div>
+</div>
+<!-- Architectural Background Elements -->
+<div class="absolute top-0 right-0 w-1/3 h-screen bg-surface-container-low -z-10 blur-3xl opacity-50 rounded-full"></div>
+<div class="absolute bottom-0 left-0 w-1/4 h-1/2 bg-surface-container-highest -z-10 blur-3xl opacity-30 rounded-full"></div>
+</section>
+<!-- Feature Section (Bento Grid Style) -->
+<section class="py-24 px-6 bg-surface-container-low">
+<div class="max-w-7xl mx-auto">
+<div class="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
+<div class="max-w-2xl">
+<h2 class="text-3xl font-bold text-on-surface mb-4">Engineered for Excellence</h2>
+<p class="text-on-surface-variant text-lg">Our features are built on the 'Architectural Ledger' principle, ensuring every data point has its purpose and place.</p>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+<!-- Real-time Tracking (Large Bento Card) -->
+<div class="md:col-span-8 bg-surface-container-lowest p-8 md:p-12 rounded-xl flex flex-col justify-between min-h-[400px]">
+<div>
+<div class="w-14 h-14 bg-primary-fixed rounded-xl flex items-center justify-center mb-8">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="query_stats">query_stats</span>
+</div>
+<h3 class="text-3xl font-bold text-on-surface mb-4">Real-time Tracking</h3>
+<p class="text-on-surface-variant text-lg max-w-md leading-relaxed">
+                                Monitor your cash flow, inventory, and sales as they happen. Zero latency, total transparency across all business units.
+                            </p>
+</div>
+<div class="mt-8 flex items-center gap-4">
+<div class="flex -space-x-3">
+<div class="w-10 h-10 rounded-full border-2 border-surface-container-lowest bg-slate-200 overflow-hidden">
+<img alt="Team" data-alt="Team member profile picture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJiuZFHuZpiL1OKoAcpF3D6UniVCvsSlWiij3KST2uNbBwUBfDgK3TdfdCe4VtVawU8ROj_0nQUP-F5qIeqwBcTksjAwKqyJ77yhNhyY0HHuDstBcgIU-2kBCs6-VXw0bw536MD8oCNYfdU2s0d7mkKV9F3UfCq_cwOqZM91yo83bpFhEyG0uY_40dvfAdF2MRrJjx0OExnQBxxathtI3bZ5Tb7eyWz6sI75QfwI2nVpKTUCyMkNK5Be1kO80JrcnAWoOA-FUIXdxt"/>
+</div>
+<div class="w-10 h-10 rounded-full border-2 border-surface-container-lowest bg-slate-200 overflow-hidden">
+<img alt="Team" data-alt="Female professional profile picture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuANzA7_im0CfguHl_036TkjFPSyCaEBgBKLOEBv3VxIVz13lcfHGcXmc381qwhzkYvtMf-1yiMD1328dK8FHllsB6ICKU07QTjka23u0-yBEuRJWReR01V343z_YmTJYst-Gxs_2UDP4ksDYotaPlE5Bx9xXOlGjPKFc1TyoZbMOAO2TBTkpshpkGp0JQrtmYH0hithyw1ecFoJDpuBFVWH3-F6MiWJiVWXZi3S-3aPrBnWWr0B_sNbx5dMyNROMp0RXJrSSINwRYA8"/>
+</div>
+<div class="w-10 h-10 rounded-full border-2 border-surface-container-lowest bg-slate-200 overflow-hidden">
+<img alt="Team" data-alt="Male business executive portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcx8l-BmvqvbB5cCGirpCdPRT6JRQDG_VdEdAL-myWLytzpHJIUH7GgB0nqSwcgq0Nqs_g2obwg9tcKW5kTgckeo3ZkCubqmjceX3aAoP5Ho9Svzz-jMVnAZS5X5u3e1bY23C-7Kg_JVKkE2F3MjEcXF4WzRXi36myahqHssPGoQmjsVr9THcuq_LNjSndobIi-CnuMX6Adv8PVKmOXvpk6VcBPqkHbwZsbw_k78nxUpdhABZrxywbfGjsmnFAgZX5-Jl6mx3F0g0q"/>
+</div>
+</div>
+<span class="text-sm font-medium text-on-secondary-fixed-variant">Used by 1,200+ Enterprises</span>
+</div>
+</div>
+<!-- AI Anomaly (Vertical Bento Card) -->
+<div class="md:col-span-4 bg-primary p-8 md:p-10 rounded-xl text-white flex flex-col justify-between">
+<div class="w-14 h-14 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center mb-8">
+<span class="material-symbols-outlined text-tertiary-fixed text-3xl" data-icon="hub">hub</span>
+</div>
+<div>
+<h3 class="text-2xl font-bold mb-4">AI-Powered Anomaly Detection</h3>
+<p class="text-on-primary-container text-sm leading-relaxed mb-6">
+                                Our proprietary engine identifies irregularities before they become liabilities, protecting your bottom line.
+                            </p>
+</div>
+<div class="h-1 bg-white/20 rounded-full overflow-hidden">
+<div class="h-full bg-tertiary-fixed-dim w-3/4"></div>
+</div>
+</div>
+<!-- Additional Metrics -->
+<div class="md:col-span-4 bg-surface-container-lowest p-8 rounded-xl">
+<div class="mb-4 flex justify-between items-start">
+<span class="text-label text-xs uppercase tracking-widest text-on-surface-variant">Efficiency Rate</span>
+<span class="px-2 py-1 bg-tertiary-container text-on-tertiary-container text-xs font-bold rounded-lg">+12.5%</span>
+</div>
+<div class="text-4xl font-bold text-on-surface mb-2">99.8%</div>
+<p class="text-on-surface-variant text-sm">System operational uptime and transaction accuracy.</p>
+</div>
+<div class="md:col-span-8 bg-surface-container-lowest p-8 rounded-xl flex items-center gap-8">
+<div class="flex-1">
+<h4 class="font-bold text-on-surface text-xl mb-2">Unified Dashboard</h4>
+<p class="text-on-surface-variant text-sm">Every metric you need, visible on a single plane of glass. No more tab switching.</p>
+</div>
+<div class="hidden sm:block">
+<div class="flex gap-2">
+<div class="w-12 h-2 rounded-full bg-surface-container-highest"></div>
+<div class="w-6 h-2 rounded-full bg-primary"></div>
+<div class="w-4 h-2 rounded-full bg-surface-container-highest"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA Section -->
+<section class="py-24 px-6 text-center max-w-4xl mx-auto">
+<h2 class="text-4xl font-bold text-on-surface mb-6">Ready to Elevate Your Vyapar?</h2>
+<p class="text-on-surface-variant text-lg mb-10 leading-relaxed">
+                Join thousands of business owners who have found clarity and growth through our intelligent guidance platform.
+            </p>
+<div class="flex justify-center">
+<button class="px-10 py-5 bg-primary text-white font-bold rounded-xl text-lg hover:bg-primary-container transition-all hover:shadow-2xl hover:-translate-y-1">
+                    Start Your Free Trial
+                </button>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full px-8 py-12 flex flex-col md:flex-row justify-between items-center bg-white dark:bg-slate-950 font-inter text-xs uppercase tracking-widest border-t-0">
+<div class="flex flex-col gap-2 mb-8 md:mb-0">
+<span class="font-bold text-blue-900 text-lg">Vyapar Margadarshan</span>
+<p class="text-slate-500 normal-case tracking-normal">© 2024 Vyapar Margadarshan. All rights reserved.</p>
+</div>
+<div class="flex gap-8">
+<a class="text-slate-500 hover:text-blue-600 transition-colors" href="#">Privacy Policy</a>
+<a class="text-slate-500 hover:text-blue-600 transition-colors" href="#">Terms of Service</a>
+<a class="text-slate-500 hover:text-blue-600 transition-colors" href="#">Contact Support</a>
+</div>
+</footer>
+</body></html>
