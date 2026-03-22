@@ -1,4 +1,10 @@
 -r base.txt
 
-# Development-specific packages
-django-debug-toolbar>=4.2,<5.0
+# Development tools
+ipython==8.21.0
+django-extensions==3.2.3
+
+# Testing
+pytest==8.0.0
+pytest-django==4.8.0
+factory-boy==3.3.0
