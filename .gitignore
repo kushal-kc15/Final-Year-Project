@@ -1,18 +1,18 @@
 .DS_Store
 Thumbs.db
 
+# Python cache
+*.pyc
+__pycache__/
 
+# Backend
 backend/venv/
 backend/__pycache__/
 backend/db.sqlite3
 backend/.env
 backend/.hypothesis/
-*.pyc
 
-
+# Frontend
 frontend/node_modules/
-frontend/build/
+frontend/dist/
 frontend/.env
-
-# Ignore kiro specification folder
-.kiro/
