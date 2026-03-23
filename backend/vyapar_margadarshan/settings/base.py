@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'users',
     'expenses',
     'organizations',
+    'budgets',
 ]
 
 # Custom User Model

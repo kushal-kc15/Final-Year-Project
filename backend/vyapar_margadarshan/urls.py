@@ -15,4 +15,7 @@ urlpatterns = [
     
     # Organizations endpoints
     path('api/', include('organizations.urls')),
+    
+    # Budgets endpoints
+    path('api/', include('budgets.urls')),
 ]
