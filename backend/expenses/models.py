@@ -44,6 +44,7 @@ class Expense(models.Model):
         validators=[MinValueValidator(Decimal('0.01'))]
     )
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    vendor = models.CharField(max_length=255, blank=True, null=True)
     date = models.DateField()
     description = models.TextField(blank=True)
     status = models.CharField(

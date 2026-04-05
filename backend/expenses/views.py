@@ -8,6 +8,7 @@ from django.utils import timezone
 from datetime import timedelta
 from .models import Expense
 from .serializers import ExpenseSerializer
+from activity_logs.utils import log_activity
 
 
 class ExpenseViewSet(viewsets.ModelViewSet):
@@ -49,18 +50,34 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         # Set status based on role
         if member and member.role == 'STAFF':
             # Staff expenses need approval
-            serializer.save(
+            expense = serializer.save(
                 user=user,
                 organization=member.organization,
                 status='PENDING'
             )
+            # Log activity
+            log_activity(
+                organization=member.organization,
+                user=user,
+                action_type='EXPENSE_CREATED',
+                description=f"{user.get_full_name()} created expense: {expense.title} (रू {expense.amount})",
+                metadata={'expense_id': expense.id, 'status': 'PENDING'}
+            )
         else:
             # Owner/Manager expenses are auto-approved
             if member:
-                serializer.save(
+                expense = serializer.save(
                     user=user,
                     organization=member.organization,
                     status='APPROVED'
+                )
+                # Log activity
+                log_activity(
+                    organization=member.organization,
+                    user=user,
+                    action_type='EXPENSE_CREATED',
+                    description=f"{user.get_full_name()} created expense: {expense.title} (रू {expense.amount})",
+                    metadata={'expense_id': expense.id, 'status': 'APPROVED'}
                 )
             else:
                 # User without organization (shouldn't happen, but handle it)
@@ -284,6 +301,15 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         expense.status = 'APPROVED'
         expense.save()
         
+        # Log activity
+        log_activity(
+            organization=member.organization,
+            user=user,
+            action_type='EXPENSE_APPROVED',
+            description=f"{user.get_full_name()} approved expense: {expense.title} (रू {expense.amount}) by {expense.user.get_full_name()}",
+            metadata={'expense_id': expense.id, 'approved_by': user.id}
+        )
+        
         serializer = self.get_serializer(expense)
         return Response(serializer.data)
     
@@ -332,5 +358,65 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         # For now, just change status
         expense.save()
         
+        # Log activity
+        log_activity(
+            organization=member.organization,
+            user=user,
+            action_type='EXPENSE_REJECTED',
+            description=f"{user.get_full_name()} rejected expense: {expense.title} (रू {expense.amount}) by {expense.user.get_full_name()}",
+            metadata={'expense_id': expense.id, 'rejected_by': user.id, 'reason': rejection_reason}
+        )
+        
         serializer = self.get_serializer(expense)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def vendor_analytics(self, request):
+        """Get vendor spending analytics"""
+        user = request.user
+        
+        # Get user's role
+        from organizations.models import OrganizationMember
+        member = OrganizationMember.objects.filter(user=user).first()
+        
+        # Determine which expenses to include
+        if member and member.role in ['OWNER', 'MANAGER']:
+            # OWNER/MANAGER see all organization expenses (only APPROVED)
+            expenses = Expense.objects.filter(
+                organization=member.organization,
+                status='APPROVED',
+                vendor__isnull=False
+            ).exclude(vendor='')
+        else:
+            # STAFF see only their own expenses
+            expenses = Expense.objects.filter(
+                user=user,
+                vendor__isnull=False
+            ).exclude(vendor='')
+        
+        # Group by vendor and calculate totals
+        from django.db.models import Sum, Count
+        vendor_stats = expenses.values('vendor').annotate(
+            total_amount=Sum('amount'),
+            transaction_count=Count('id')
+        ).order_by('-total_amount')
+        
+        # Convert to list and format
+        vendors = []
+        for stat in vendor_stats:
+            vendors.append({
+                'vendor': stat['vendor'],
+                'total_amount': float(stat['total_amount']),
+                'transaction_count': stat['transaction_count']
+            })
+        
+        # Calculate overall stats
+        total_vendors = len(vendors)
+        total_spent = sum(v['total_amount'] for v in vendors)
+        
+        return Response({
+            'vendors': vendors,
+            'total_vendors': total_vendors,
+            'total_spent': total_spent
+        })
+

@@ -18,4 +18,13 @@ urlpatterns = [
     
     # Budgets endpoints
     path('api/', include('budgets.urls')),
+    
+    # Analytics endpoints
+    path('api/analytics/', include('analytics.urls')),
+    
+    # Activity logs endpoints
+    path('api/activity-logs/', include('activity_logs.urls')),
+    
+    # Receipts endpoints
+    path('api/receipts/', include('receipts.urls')),
 ]

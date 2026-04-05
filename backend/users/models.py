@@ -12,6 +12,13 @@ class User(AbstractUser):
         ('manager', 'Manager'),
         ("staff", "Staff"),
     }
+    
+    CURRENCY_CHOICES = [
+        ('NPR', 'रू (NPR)'),
+        ('USD', '$ (USD)'),
+        ('EUR', '€ (EUR)'),
+    ]
+    
     business_name = models.CharField(
         max_length=255, 
         blank=True,
@@ -22,6 +29,25 @@ class User(AbstractUser):
         blank=True,
         help_text="Contact phone number"
     )
+    
+    # Preferences
+    default_currency = models.CharField(
+        max_length=3,
+        choices=CURRENCY_CHOICES,
+        default='NPR',
+        help_text="Preferred currency for display"
+    )
+    items_per_page = models.IntegerField(
+        default=10,
+        help_text="Number of items to display per page in tables"
+    )
+    theme_preference = models.CharField(
+        max_length=10,
+        choices=[('light', 'Light'), ('dark', 'Dark'), ('system', 'System')],
+        default='system',
+        help_text="UI theme preference"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

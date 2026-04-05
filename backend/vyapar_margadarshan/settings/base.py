@@ -32,6 +32,9 @@ INSTALLED_APPS = [
     'expenses',
     'organizations',
     'budgets',
+    'analytics',
+    'activity_logs',
+    'receipts',
 ]
 
 # Custom User Model
