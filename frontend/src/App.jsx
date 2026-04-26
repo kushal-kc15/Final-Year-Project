@@ -5,6 +5,7 @@ import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Expenses from './pages/Expenses'
 import OrganizationSetup from './pages/OrganizationSetup'
+import AcceptInvitation from './pages/AcceptInvitation'
 import TeamManagement from './pages/TeamManagement'
 import ApprovalQueue from './pages/ApprovalQueue'
 import BudgetManagement from './pages/BudgetManagement'
@@ -28,6 +29,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/invite" element={<AcceptInvitation />} />
           <Route 
             path="/setup" 
             element={

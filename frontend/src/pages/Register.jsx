@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import authService from '../services/authService';
 
 function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('invite');
+  
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -40,7 +43,14 @@ function Register() {
     try {
       await authService.register(formData);
       await authService.login({ username: formData.username, password: formData.password });
-      navigate('/setup');
+      
+      // If there's an invitation token, redirect to accept page (FORCE RELOAD)
+      if (inviteToken) {
+        window.location.href = `/invite?token=${inviteToken}`;
+      } else {
+        // New user creates organization
+        window.location.href = '/setup';
+      }
     } catch (err) {
       const errorData = err.response?.data;
       if (errorData) {
@@ -89,6 +99,18 @@ function Register() {
       {/* Card */}
       <div className="relative w-full max-w-[440px] bg-white rounded-2xl border border-slate-200 shadow-float p-8 z-10">
 
+        {inviteToken && (
+          <div className="mb-6 flex items-start gap-3 bg-brand-50 border border-brand-200 rounded-xl px-4 py-3">
+            <span className="material-icons text-brand-600 text-sm mt-0.5">mail</span>
+            <div>
+              <p className="text-sm font-bold text-brand-900">You've been invited to join an organization!</p>
+              <p className="text-xs text-brand-700 mt-0.5">
+                Create your account to accept the invitation.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="mb-6">
           <h1 className="font-display text-2xl font-700 text-slate-900 mb-1.5">
@@ -112,7 +134,7 @@ function Register() {
             <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === 2 ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-400'}`}>
               2
             </div>
-            Business & password
+            {inviteToken ? 'Password' : 'Business & password'}
           </div>
         </div>
 
@@ -205,35 +227,40 @@ function Register() {
         {/* ── Step 2 ── */}
         {step === 2 && (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className={labelClass}>Business name</label>
-              <div className="relative">
-                <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">storefront</span>
-                <input
-                  name="business_name"
-                  type="text"
-                  value={formData.business_name}
-                  onChange={handleChange}
-                  placeholder="Sharma Traders Pvt. Ltd."
-                  className={inputClass}
-                />
-              </div>
-            </div>
+            {/* Only show business fields if NOT joining via invitation */}
+            {!inviteToken && (
+              <>
+                <div>
+                  <label className={labelClass}>Business name</label>
+                  <div className="relative">
+                    <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">storefront</span>
+                    <input
+                      name="business_name"
+                      type="text"
+                      value={formData.business_name}
+                      onChange={handleChange}
+                      placeholder="Sharma Traders Pvt. Ltd."
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
 
-            <div>
-              <label className={labelClass}>Phone number</label>
-              <div className="relative">
-                <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">phone</span>
-                <input
-                  name="phone_number"
-                  type="tel"
-                  value={formData.phone_number}
-                  onChange={handleChange}
-                  placeholder="+977 98XXXXXXXX"
-                  className={inputClass}
-                />
-              </div>
-            </div>
+                <div>
+                  <label className={labelClass}>Phone number</label>
+                  <div className="relative">
+                    <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">phone</span>
+                    <input
+                      name="phone_number"
+                      type="tel"
+                      value={formData.phone_number}
+                      onChange={handleChange}
+                      placeholder="+977 98XXXXXXXX"
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             <div>
               <label className={labelClass}>Password</label>

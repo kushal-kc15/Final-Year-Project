@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import authService from '../services/authService';
 
 function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('invite');
+  
   const [formData, setFormData] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,8 +27,13 @@ function Login() {
     try {
       await authService.login(formData);
 
-      // ✅ FORCE RELOAD so auth state updates
-      window.location.href = '/dashboard';
+      // If there's an invitation token, redirect to accept page
+      if (inviteToken) {
+        window.location.href = `/invite?token=${inviteToken}`;
+      } else {
+        // ✅ FORCE RELOAD so auth state updates
+        window.location.href = '/dashboard';
+      }
 
     } catch (err) {
       setError(err.response?.data?.detail || 'Invalid username or password.');
@@ -60,6 +68,21 @@ function Login() {
       </div>
 
       <div className="relative w-full max-w-[400px] bg-white rounded-2xl border border-slate-200 shadow-float p-8 z-10">
+
+        {inviteToken && (
+          <div className="mb-6 flex items-start gap-3 bg-brand-50 border border-brand-200 rounded-xl px-4 py-3">
+            <span className="material-icons text-brand-600 text-sm mt-0.5">mail</span>
+            <div>
+              <p className="text-sm font-bold text-brand-900">You've been invited!</p>
+              <p className="text-xs text-brand-700 mt-0.5">
+                Don't have an account?{' '}
+                <Link to={`/register?invite=${inviteToken}`} className="font-semibold underline">
+                  Create one here
+                </Link>
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="mb-8">
           <h1 className="font-display text-2xl font-700 text-slate-900 mb-1.5">

@@ -10,6 +10,7 @@ from .serializers import (
     OrganizationMemberSerializer,
     InvitationSerializer
 )
+from .emails import send_invitation_email
 
 
 class OrganizationViewSet(viewsets.ModelViewSet):
@@ -105,8 +106,14 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             expires_at=timezone.now() + timedelta(days=7)
         )
         
+        # Send invitation email
+        email_sent = send_invitation_email(invitation, request)
+        
         serializer = InvitationSerializer(invitation)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        response_data = serializer.data
+        response_data['email_sent'] = email_sent
+        
+        return Response(response_data, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=['patch'])
     def update_member_role(self, request, pk=None):

@@ -139,7 +139,12 @@ def period_comparison(request):
     # Calculate date ranges
     today = datetime.now().date()
     
-    if period_type == 'week':
+    if period_type == 'day':
+        current_start = today
+        current_end = today
+        previous_start = today - timedelta(days=1)
+        previous_end = today - timedelta(days=1)
+    elif period_type == 'week':
         current_start = today - timedelta(days=today.weekday())
         current_end = today
         previous_start = current_start - timedelta(days=7)

@@ -100,6 +100,13 @@ function TeamManagement() {
   const [toast,        setToast]        = useState(null);
   const [search,       setSearch]       = useState('');
   const [roleFilter,   setRoleFilter]   = useState('ALL');
+  
+  // Invite modal state
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('STAFF');
+  const [inviting, setInviting] = useState(false);
+  const [inviteLink, setInviteLink] = useState('');
 
   useEffect(() => { if (!authLoading) fetchData(); }, [authLoading]);
 
@@ -129,6 +136,48 @@ function TeamManagement() {
   const handleRemove = (memberId) => {
     if (currentUserRole !== 'OWNER') { showToast('Only owners can remove members.'); return; }
     setConfirmState({ open: true, type: 'remove', memberId, newRole: null, message: 'Remove this member from the organisation?' });
+  };
+
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    if (!inviteEmail) return;
+    
+    setInviting(true);
+    try {
+      const response = await api.post(`/organizations/${organization.id}/invite/`, {
+        email: inviteEmail,
+        role: inviteRole
+      });
+      
+      // Generate invitation link
+      const token = response.data.token;
+      const link = `${window.location.origin}/invite?token=${token}`;
+      setInviteLink(link);
+      
+      // Check if email was sent
+      const emailSent = response.data.email_sent;
+      if (emailSent) {
+        showToast('Invitation sent via email! You can also share the link below.', 'success');
+      } else {
+        showToast('Invitation created! Share the link below (email sending is disabled in development).', 'success');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to send invitation');
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const copyInviteLink = () => {
+    navigator.clipboard.writeText(inviteLink);
+    showToast('Link copied to clipboard!', 'success');
+  };
+
+  const closeInviteModal = () => {
+    setInviteModalOpen(false);
+    setInviteEmail('');
+    setInviteRole('STAFF');
+    setInviteLink('');
   };
 
   const handleConfirm = async () => {
@@ -168,12 +217,23 @@ function TeamManagement() {
         {/* Header */}
         <header className="sticky top-0 z-30 bg-white border-b border-slate-200 px-8 h-16 flex items-center justify-between shrink-0">
           <h1 className="font-display text-lg font-700 text-slate-900">Team</h1>
-          {!loading && (
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <span className="material-icons text-[18px] text-slate-400">group</span>
-              {members.length} member{members.length !== 1 ? 's' : ''}
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {!loading && (
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <span className="material-icons text-[18px] text-slate-400">group</span>
+                {members.length} member{members.length !== 1 ? 's' : ''}
+              </div>
+            )}
+            {(currentUserRole === 'OWNER' || currentUserRole === 'MANAGER') && (
+              <button
+                onClick={() => setInviteModalOpen(true)}
+                className="flex items-center gap-2 bg-brand-700 hover:bg-brand-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm"
+              >
+                <span className="material-icons text-[18px]">person_add</span>
+                Invite Member
+              </button>
+            )}
+          </div>
         </header>
 
         <div className="flex-1 p-8 space-y-7 overflow-y-auto">
@@ -297,6 +357,125 @@ function TeamManagement() {
         onConfirm={handleConfirm}
         onCancel={() => setConfirmState({ open: false, type: null, memberId: null, newRole: null, message: '' })}
       />
+
+      {/* Invite Modal */}
+      {inviteModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-7">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-display text-xl font-700 text-slate-900">Invite Team Member</h3>
+              <button
+                onClick={closeInviteModal}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <span className="material-icons">close</span>
+              </button>
+            </div>
+
+            {!inviteLink ? (
+              <form onSubmit={handleInvite} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="colleague@example.com"
+                    className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition-all text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                    Role
+                  </label>
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value)}
+                    className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition-all text-slate-900"
+                  >
+                    <option value="STAFF">Staff</option>
+                    <option value="MANAGER">Manager</option>
+                    <option value="OWNER">Owner</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeInviteModal}
+                    className="flex-1 py-2.5 border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-colors text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={inviting}
+                    className="flex-1 py-2.5 bg-brand-700 text-white font-semibold rounded-xl hover:bg-brand-800 transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {inviting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-icons text-sm">send</span>
+                        Create Invitation
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
+                  <span className="material-icons text-emerald-600 text-xl">check_circle</span>
+                  <div>
+                    <p className="text-sm font-bold text-emerald-900">Invitation Created!</p>
+                    <p className="text-xs text-emerald-700 mt-0.5">Share this link with {inviteEmail}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                    Invitation Link
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={inviteLink}
+                      className="flex-1 px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-mono text-xs"
+                    />
+                    <button
+                      onClick={copyInviteLink}
+                      className="px-4 py-2.5 bg-brand-700 text-white font-semibold rounded-xl hover:bg-brand-800 transition-colors text-sm flex items-center gap-2"
+                    >
+                      <span className="material-icons text-sm">content_copy</span>
+                      Copy
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-500">
+                  The recipient must register or login with <span className="font-semibold">{inviteEmail}</span> to accept this invitation.
+                </p>
+
+                <button
+                  onClick={closeInviteModal}
+                  className="w-full py-2.5 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors text-sm"
+                >
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>

@@ -14,7 +14,7 @@ export const AuthProvider = ({ children }) => {
   const location    = useLocation();
   const initialized = useRef(false);
 
-  const publicPaths = ['/', '/login', '/register', '/setup'];
+  const publicPaths = ['/', '/login', '/register', '/setup', '/invite'];
 
   const logout = () => {
     authService.logout();
