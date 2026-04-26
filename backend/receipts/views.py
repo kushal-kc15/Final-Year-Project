@@ -6,15 +6,7 @@ from django.utils import timezone
 from organizations.models import OrganizationMember
 from .models import Receipt
 from .serializers import ReceiptSerializer, ReceiptUploadSerializer
-
-# Try to import full OCR processor, fallback to simple one
-try:
-    from .ocr_processor import OCRProcessor
-    OCR_AVAILABLE = True
-except Exception as e:
-    from .ocr_processor_simple import SimpleOCRProcessor as OCRProcessor
-    OCR_AVAILABLE = False
-    print(f"Warning: Full OCR not available, using simple processor. Error: {e}")
+from .ocr_processor import OCRProcessor
 
 import os
 
@@ -37,13 +29,18 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         """
         user = request.user
         
-        # Get user's organization
+        # Get user's organization (first one if multiple)
         try:
-            member = OrganizationMember.objects.get(user=user)
+            member = OrganizationMember.objects.filter(user=user).first()
+            if not member:
+                return Response(
+                    {'error': 'User is not part of any organization'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             organization = member.organization
-        except OrganizationMember.DoesNotExist:
+        except Exception as e:
             return Response(
-                {'error': 'User is not part of any organization'},
+                {'error': f'Error getting organization: {str(e)}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -74,6 +71,8 @@ class ReceiptViewSet(viewsets.ModelViewSet):
             receipt.amount_confidence = extracted_data['amount_confidence']
             receipt.receipt_date = extracted_data['receipt_date']
             receipt.date_confidence = extracted_data['date_confidence']
+            receipt.category = extracted_data.get('category', 'OTHER')
+            receipt.description = extracted_data.get('description', '')
             receipt.line_items = extracted_data['line_items']
             receipt.status = 'COMPLETED'
             receipt.processed_at = timezone.now()
@@ -112,6 +111,12 @@ class ReceiptViewSet(viewsets.ModelViewSet):
             receipt.receipt_date = request.data['receipt_date']
             receipt.date_confidence = 100
         
+        if 'category' in request.data:
+            receipt.category = request.data['category']
+        
+        if 'description' in request.data:
+            receipt.description = request.data['description']
+        
         if 'line_items' in request.data:
             receipt.line_items = request.data['line_items']
         
@@ -134,7 +139,12 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         
         # Get organization
         try:
-            member = OrganizationMember.objects.get(user=user)
+            member = OrganizationMember.objects.filter(user=user).first()
+            if not member:
+                return Response(
+                    {'error': 'User is not part of any organization'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             organization = member.organization
         except OrganizationMember.DoesNotExist:
             return Response(
@@ -153,10 +163,10 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         expense_data = {
             'title': request.data.get('title', f'Receipt from {receipt.vendor_name or "Unknown"}'),
             'amount': request.data.get('amount', receipt.total_amount),
-            'category': request.data.get('category', 'OTHER'),
+            'category': request.data.get('category', receipt.category or 'OTHER'),
             'vendor': request.data.get('vendor', receipt.vendor_name),
             'date': request.data.get('date', receipt.receipt_date),
-            'description': request.data.get('description', f'Auto-created from receipt OCR'),
+            'description': request.data.get('description', receipt.description or f'Auto-created from receipt OCR'),
         }
         
         # Determine status based on role

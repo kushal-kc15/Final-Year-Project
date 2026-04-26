@@ -1,289 +1,137 @@
 import re
-import pytesseract
-from PIL import Image
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
-import cv2
-import numpy as np
+from decimal import Decimal
+import os
+import time
 
-# Import Tesseract configuration
-try:
-    from .tesseract_config import TESSERACT_PATH
-except ImportError:
-    pass
+from google import genai
+from google.genai import types
+from PIL import Image
 
 
 class OCRProcessor:
     """
-    Process receipt images and extract structured data using OCR
+    Process receipt images and extract structured data using Google Gemini API
     """
     
     def __init__(self, image_path):
         self.image_path = image_path
-        self.raw_text = ""
         
-    def preprocess_image(self):
-        """
-        Preprocess image for better OCR accuracy
-        """
-        # Read image
-        img = cv2.imread(self.image_path)
+        # Get Gemini API key
+        from decouple import config
+        self.gemini_api_key = config('GEMINI_API_KEY')
+        self.client = genai.Client(api_key=self.gemini_api_key)
         
-        # Convert to grayscale
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        
-        # Apply thresholding to get black and white image
-        _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        
-        # Denoise
-        denoised = cv2.fastNlMeansDenoising(thresh, None, 10, 7, 21)
-        
-        return denoised
+        # Retry configuration
+        self.max_retries = 3
+        self.retry_delay = 2  # seconds
     
-    def extract_text(self):
+    def extract_with_gemini(self):
         """
-        Extract raw text from image using Tesseract OCR
+        Extract receipt data using Google Gemini API with retry logic
+        Returns structured data directly
         """
-        try:
-            # Preprocess image
-            processed_img = self.preprocess_image()
-            
-            # Perform OCR
-            self.raw_text = pytesseract.image_to_string(processed_img)
-            
-            return self.raw_text
-        except Exception as e:
-            print(f"OCR extraction error: {e}")
-            # Fallback to basic PIL OCR
-            img = Image.open(self.image_path)
-            self.raw_text = pytesseract.image_to_string(img)
-            return self.raw_text
-    
-    def extract_vendor(self):
-        """
-        Extract vendor name (prioritize company names, ignore generic words)
-        Returns: (vendor_name, confidence)
-        """
-        lines = [line.strip() for line in self.raw_text.split('\n') if line.strip()]
+        last_error = None
         
-        if not lines:
-            return None, 0
-        
-        # Words to ignore when looking for vendor names
-        ignore_words = {
-            'receipt', 'invoice', 'bill', 'tax', 'total', 'subtotal',
-            'payment', 'cash', 'credit', 'debit', 'date', 'time',
-            'qty', 'quantity', 'description', 'amount', 'price', 'logo'
-        }
-        
-        # Look for company indicators
-        company_indicators = ['inc', 'llc', 'ltd', 'corp', 'company', 'co.', 'pvt']
-        
-        # Search in first 10 lines for vendor
-        for line in lines[:10]:
-            line_lower = line.lower()
-            
-            # Skip if line is just a generic word
-            if line_lower in ignore_words:
-                continue
-            
-            # Skip lines that are mostly numbers or symbols
-            if len(re.findall(r'[a-zA-Z]', line)) < len(line) * 0.5:
-                continue
-            
-            # Skip lines with date patterns (to avoid including dates in vendor name)
-            if re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{4}|\d{8}', line):
-                # But check if there's a company name before the date
-                parts = re.split(r'\s+(?:RECEIPT\s+)?DATE\s+\d', line, flags=re.IGNORECASE)
-                if len(parts) > 1 and len(parts[0].strip()) > 3:
-                    vendor = re.sub(r'[^a-zA-Z0-9\s&\'\-\.,]', '', parts[0]).strip()
-                    if any(indicator in vendor.lower() for indicator in company_indicators):
-                        return vendor, 95
-                continue
-            
-            # High confidence if contains company indicator
-            if any(indicator in line_lower for indicator in company_indicators):
-                vendor = re.sub(r'[^a-zA-Z0-9\s&\'\-\.,]', '', line).strip()
-                if len(vendor) > 2:
-                    return vendor, 95
-            
-            # Look for "FROM" section (common in receipts)
-            if 'from' in line_lower:
-                # Get the next line after "FROM"
-                idx = lines.index(line)
-                if idx + 1 < len(lines):
-                    next_line = lines[idx + 1]
-                    if len(next_line) > 2 and next_line.lower() not in ignore_words:
-                        # Clean up: remove date patterns from vendor name
-                        vendor = next_line
-                        # Remove everything after DATE keyword
-                        vendor = re.split(r'\s+(?:RECEIPT\s+)?DATE\s+', vendor, flags=re.IGNORECASE)[0]
-                        # Remove date patterns
-                        vendor = re.sub(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{4}|\d{8}', '', vendor)
-                        # Clean special characters
-                        vendor = re.sub(r'[^a-zA-Z0-9\s&\'\-\.,]', '', vendor).strip()
-                        if len(vendor) > 2:
-                            return vendor, 90
-            
-            # Medium confidence for lines with mostly letters
-            if len(re.findall(r'[a-zA-Z]', line)) > len(line) * 0.7:
-                vendor = re.sub(r'[^a-zA-Z0-9\s&\'\-\.,]', '', line).strip()
-                if len(vendor) > 3 and vendor.lower() not in ignore_words:
-                    return vendor, 70
-        
-        return lines[0] if lines else None, 40
-    
-    def extract_amount(self):
-        """
-        Extract total amount (improved pattern matching)
-        Returns: (amount, confidence)
-        """
-        # Common patterns for total amount
-        patterns = [
-            # TOTAL with amount on same line
-            r'total[:\s]*[\$रू€£]?\s*(\d+[,.]?\d*\.?\d{2})',
-            # Amount after TOTAL keyword
-            r'total.*?(\d+[,.]?\d*\.?\d{2})',
-            # Grand total
-            r'grand\s*total[:\s]*[\$रू€£]?\s*(\d+[,.]?\d*\.?\d{2})',
-            # Amount due
-            r'amount\s*due[:\s]*[\$रू€£]?\s*(\d+[,.]?\d*\.?\d{2})',
-            # Balance due
-            r'balance[:\s]*[\$रू€£]?\s*(\d+[,.]?\d*\.?\d{2})',
-            # Total amount
-            r'total\s*amount[:\s]*[\$रू€£]?\s*(\d+[,.]?\d*\.?\d{2})',
-            # Currency symbol followed by amount at end of line
-            r'[\$रू€£]\s*(\d+[,.]?\d*\.?\d{2})\s*$',
-        ]
-        
-        text_lower = self.raw_text.lower()
-        lines = text_lower.split('\n')
-        
-        # First, look for explicit TOTAL lines
-        for line in lines:
-            if 'total' in line and 'subtotal' not in line:
-                for pattern in patterns[:6]:  # Use total-specific patterns
-                    matches = re.findall(pattern, line, re.IGNORECASE)
-                    if matches:
-                        amount_str = matches[-1].replace(',', '').replace(' ', '')
-                        try:
-                            amount = Decimal(amount_str)
-                            if 0 < amount < 1000000:
-                                return amount, 95
-                        except (InvalidOperation, ValueError):
-                            continue
-        
-        # Then search entire text
-        for pattern in patterns:
-            matches = re.findall(pattern, text_lower, re.IGNORECASE | re.MULTILINE)
-            if matches:
-                amount_str = matches[-1].replace(',', '').replace(' ', '')
-                try:
-                    amount = Decimal(amount_str)
-                    if 0 < amount < 1000000:
-                        confidence = 85 if 'total' in pattern else 70
-                        return amount, confidence
-                except (InvalidOperation, ValueError):
-                    continue
-        
-        # Fallback: find largest number that looks like money
-        all_numbers = re.findall(r'\d+[,.]?\d*\.?\d{2}', self.raw_text)
-        if all_numbers:
+        for attempt in range(self.max_retries):
             try:
-                amounts = [Decimal(n.replace(',', '')) for n in all_numbers]
-                amounts = [a for a in amounts if 0 < a < 1000000]
-                if amounts:
-                    return max(amounts), 50
-            except:
-                pass
-        
-        return None, 0
-    
-    def extract_date(self):
-        """
-        Extract receipt date - always returns today's date
-        Returns: (date, confidence)
-        """
-        # Always use today's date when expense is added
-        return datetime.now().date(), 100
-    
-    def extract_line_items(self):
-        """
-        Extract individual line items from receipt (improved table detection)
-        Returns: list of dicts with {description, quantity, unit_price, amount}
-        """
-        items = []
-        lines = self.raw_text.split('\n')
-        
-        # Look for table headers
-        in_items_section = False
-        for i, line in enumerate(lines):
-            line_lower = line.lower()
-            
-            # Detect start of items section
-            if any(keyword in line_lower for keyword in ['qty', 'description', 'item', 'product']):
-                in_items_section = True
-                continue
-            
-            # Detect end of items section
-            if any(keyword in line_lower for keyword in ['subtotal', 'total', 'tax', 'payment']):
-                in_items_section = False
-                continue
-            
-            if in_items_section or not items:  # Always try to extract items
-                # Pattern 1: QTY Description Price Amount
-                match = re.search(r'^(\d+)\s+(.+?)\s+(\d+\.?\d*)\s+(\d+\.?\d*)$', line.strip())
-                if match:
-                    qty, desc, price, amount = match.groups()
-                    items.append({
-                        'quantity': int(qty),
-                        'description': desc.strip(),
-                        'unit_price': float(price),
-                        'amount': float(amount)
-                    })
-                    continue
+                # Load image
+                img = Image.open(self.image_path)
                 
-                # Pattern 2: Description followed by amount at end
-                match = re.search(r'^(.+?)\s+(\d+\.?\d{2})$', line.strip())
-                if match and len(match.group(1)) > 3:
-                    desc, amount = match.groups()
-                    # Skip if description looks like a total line
-                    if not any(word in desc.lower() for word in ['total', 'subtotal', 'tax', 'due', 'balance']):
-                        try:
-                            amount_val = float(amount)
-                            if 0 < amount_val < 10000:
-                                items.append({
-                                    'quantity': 1,
-                                    'description': desc.strip(),
-                                    'unit_price': amount_val,
-                                    'amount': amount_val
-                                })
-                        except ValueError:
-                            continue
+                # Create prompt for structured extraction
+                prompt = """Analyze this receipt image and extract the following information in JSON format:
+
+{
+    "vendor_name": "name of the store/vendor",
+    "total_amount": "total amount as a number (e.g., 1234.56)",
+    "receipt_date": "date in YYYY-MM-DD format",
+    "category": "one of: FOOD, TRANSPORT, OFFICE, UTILITIES, SALARY, RENT, MARKETING, OTHER",
+    "description": "brief description of what this expense is for",
+    "line_items": [
+        {
+            "description": "item name",
+            "quantity": 1,
+            "unit_price": 0.00,
+            "amount": 0.00
+        }
+    ],
+    "raw_text": "all text from the receipt"
+}
+
+Rules:
+- Extract the TOTAL amount (not subtotal)
+- If date is unclear, use today's date
+- For category, analyze the receipt content and vendor to determine the most appropriate category:
+  * FOOD: Restaurants, cafes, grocery stores, food delivery
+  * TRANSPORT: Gas stations, taxi, uber, parking, vehicle maintenance
+  * OFFICE: Stationery, office equipment, supplies
+  * UTILITIES: Electricity, water, internet, phone bills
+  * SALARY: Payroll, wages, employee payments
+  * RENT: Property rent, lease payments
+  * MARKETING: Advertising, promotional materials, social media ads
+  * OTHER: Anything that doesn't fit above categories
+- For line_items, extract as many as you can identify with accurate quantities and prices
+- Include all visible text in raw_text
+- For description, provide a brief summary of what was purchased
+- Return valid JSON only, no markdown formatting
+- If you cannot read something, use empty string or 0"""
+
+                # Call Gemini API
+                response = self.client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=[prompt, img]
+                )
+                
+                # Parse response
+                import json
+                result_text = response.text.strip()
+                
+                # Remove markdown code blocks if present
+                if result_text.startswith('```'):
+                    result_text = result_text.split('```')[1]
+                    if result_text.startswith('json'):
+                        result_text = result_text[4:]
+                    result_text = result_text.strip()
+                
+                data = json.loads(result_text)
+                
+                # Convert to expected format
+                return {
+                    'raw_text': data.get('raw_text', ''),
+                    'vendor_name': data.get('vendor_name', ''),
+                    'vendor_confidence': 95,
+                    'total_amount': Decimal(str(data.get('total_amount', 0))) if data.get('total_amount') else None,
+                    'amount_confidence': 95,
+                    'receipt_date': datetime.strptime(data.get('receipt_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d').date(),
+                    'date_confidence': 90,
+                    'category': data.get('category', 'OTHER'),
+                    'description': data.get('description', ''),
+                    'line_items': data.get('line_items', [])
+                }
+                
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                
+                # Check if it's a rate limit or high demand error
+                if '503' in error_str or 'UNAVAILABLE' in error_str or 'high demand' in error_str.lower():
+                    if attempt < self.max_retries - 1:
+                        wait_time = self.retry_delay * (2 ** attempt)  # Exponential backoff
+                        print(f"Gemini API unavailable (attempt {attempt + 1}/{self.max_retries}). Retrying in {wait_time} seconds...")
+                        time.sleep(wait_time)
+                        continue
+                
+                # For other errors, don't retry
+                print(f"Gemini API error: {e}")
+                break
         
-        return items[:20]  # Limit to 20 items
+        # If all retries failed
+        raise Exception(f"Failed to process receipt with Gemini after {self.max_retries} attempts: {str(last_error)}")
     
     def process(self):
         """
-        Main processing method - extract all data
+        Main processing method - extract all data using Gemini API
         Returns: dict with extracted data
         """
-        # Extract raw text first
-        self.extract_text()
-        
-        # Extract structured data
-        vendor, vendor_conf = self.extract_vendor()
-        amount, amount_conf = self.extract_amount()
-        date, date_conf = self.extract_date()
-        line_items = self.extract_line_items()
-        
-        return {
-            'raw_text': self.raw_text,
-            'vendor_name': vendor,
-            'vendor_confidence': vendor_conf,
-            'total_amount': amount,
-            'amount_confidence': amount_conf,
-            'receipt_date': date,
-            'date_confidence': date_conf,
-            'line_items': line_items,
-        }
+        print("Using Google Gemini API for OCR...")
+        return self.extract_with_gemini()

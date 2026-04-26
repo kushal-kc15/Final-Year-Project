@@ -38,6 +38,8 @@ class Receipt(models.Model):
         null=True
     )
     receipt_date = models.DateField(blank=True, null=True)
+    category = models.CharField(max_length=20, blank=True, null=True)
+    description = models.TextField(blank=True)
     
     # Raw OCR text
     raw_text = models.TextField(blank=True)

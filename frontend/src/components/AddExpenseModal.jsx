@@ -106,9 +106,10 @@ function AddExpenseModal({ isOpen, onClose, onSuccess }) {
       ...formData,
       title: extractedData.vendor_name ? `Receipt from ${extractedData.vendor_name}` : formData.title,
       amount: extractedData.total_amount || formData.amount,
+      category: extractedData.category || formData.category,
       vendor: extractedData.vendor_name || formData.vendor,
-      date: extractedData.receipt_date || formData.date,
-      description: 'Auto-filled from receipt scan'
+      date: new Date().toISOString().split('T')[0], // Always use today's date
+      description: extractedData.description || 'Auto-filled from receipt scan'
     });
     setShowOCRModal(false);
   };
@@ -282,6 +283,7 @@ function AddExpenseModal({ isOpen, onClose, onSuccess }) {
         {/* Modal Footer (Actions) */}
         <div className="px-8 pb-8 pt-4 flex flex-col sm:flex-row-reverse gap-3 bg-white border-t border-slate-50">
           <button 
+            type="submit"
             onClick={handleSubmit}
             disabled={loading}
             className="flex-1 bg-brand-600 text-white py-3.5 px-6 rounded-xl font-bold tracking-tight shadow-md shadow-brand-500/30 hover:shadow-lg hover:shadow-brand-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 border border-brand-500 disabled:opacity-60 disabled:hover:translate-y-0"

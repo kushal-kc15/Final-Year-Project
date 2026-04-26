@@ -9,14 +9,15 @@ class ReceiptSerializer(serializers.ModelSerializer):
         model = Receipt
         fields = [
             'id', 'image', 'vendor_name', 'total_amount', 'receipt_date',
-            'raw_text', 'vendor_confidence', 'amount_confidence', 'date_confidence',
-            'line_items', 'status', 'error_message', 'expense', 'user_name',
-            'created_at', 'updated_at', 'processed_at'
+            'category', 'description', 'raw_text', 'vendor_confidence', 
+            'amount_confidence', 'date_confidence', 'line_items', 'status', 
+            'error_message', 'expense', 'user_name', 'created_at', 'updated_at', 
+            'processed_at'
         ]
         read_only_fields = [
-            'vendor_name', 'total_amount', 'receipt_date', 'raw_text',
-            'vendor_confidence', 'amount_confidence', 'date_confidence',
-            'line_items', 'status', 'error_message', 'processed_at'
+            'vendor_name', 'total_amount', 'receipt_date', 'category', 
+            'description', 'raw_text', 'vendor_confidence', 'amount_confidence', 
+            'date_confidence', 'line_items', 'status', 'error_message', 'processed_at'
         ]
 
 

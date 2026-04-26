@@ -35,6 +35,11 @@ staticfiles/
 .env
 .env.local
 
+# Google Cloud Credentials
+*-credentials.json
+service-account*.json
+google-credentials*.json
+
 # IDE
 .vscode/
 .idea/

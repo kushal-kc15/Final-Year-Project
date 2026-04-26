@@ -23,6 +23,12 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         ).distinct()
     
     def perform_create(self, serializer):
+        # Check if user already belongs to an organization (ONE ORG RULE)
+        existing_membership = OrganizationMember.objects.filter(user=self.request.user).first()
+        if existing_membership:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError(f'You are already a member of {existing_membership.organization.name}. Users can only belong to one organization.')
+        
         # Create organization and add creator as OWNER
         organization = serializer.save()
         OrganizationMember.objects.create(
@@ -272,7 +278,15 @@ class InvitationViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Check if user is already a member
+        # Check if user already belongs to ANY organization (ONE ORG RULE)
+        existing_membership = OrganizationMember.objects.filter(user=request.user).first()
+        if existing_membership:
+            return Response(
+                {'error': f'You are already a member of {existing_membership.organization.name}. Users can only belong to one organization.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if user is already a member of THIS organization
         existing_member = OrganizationMember.objects.filter(
             organization=invitation.organization,
             user=request.user
