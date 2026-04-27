@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import Budget, BudgetAlert
 from .serializers import BudgetSerializer, BudgetAlertSerializer
+from .emails import send_budget_alert_email
+from notifications.utils import notify_budget_alert, notify_budget_exceeded
 
 
 class BudgetViewSet(viewsets.ModelViewSet):
@@ -61,8 +63,44 @@ class BudgetViewSet(viewsets.ModelViewSet):
         percentage_used = serializer.data['percentage_used']
         spent_amount = serializer.data['spent_amount']
         
-        # Check if threshold reached
-        if percentage_used >= budget.alert_threshold:
+        # Check if budget exceeded
+        if percentage_used > 100:
+            # Check if exceeded alert already exists
+            existing_exceeded = BudgetAlert.objects.filter(
+                budget=budget,
+                alert_type='EXCEEDED'
+            ).exists()
+            
+            if not existing_exceeded:
+                # Create alert
+                BudgetAlert.objects.create(
+                    budget=budget,
+                    alert_type='EXCEEDED',
+                    percentage=int(percentage_used),
+                    amount_spent=spent_amount,
+                    message=f"Budget '{budget.name}' has been exceeded! Spent {spent_amount} of {budget.amount} ({percentage_used}%)"
+                )
+                
+                # Send email to owners and managers
+                from organizations.models import OrganizationMember
+                recipients = OrganizationMember.objects.filter(
+                    organization=budget.organization,
+                    role__in=['OWNER', 'MANAGER']
+                ).values_list('user__email', flat=True)
+                
+                if recipients:
+                    send_budget_alert_email(budget, spent_amount, list(recipients))
+                
+                # Create in-app notifications
+                managers = OrganizationMember.objects.filter(
+                    organization=budget.organization,
+                    role__in=['OWNER', 'MANAGER']
+                )
+                for manager in managers:
+                    notify_budget_exceeded(manager.user, budget, spent_amount, percentage_used)
+        
+        # Check if threshold reached (warning before exceeding)
+        elif percentage_used >= budget.alert_threshold:
             # Check if alert already exists for this threshold
             existing_alert = BudgetAlert.objects.filter(
                 budget=budget,
@@ -76,25 +114,17 @@ class BudgetViewSet(viewsets.ModelViewSet):
                     alert_type='THRESHOLD',
                     percentage=int(percentage_used),
                     amount_spent=spent_amount,
-                    message=f"Budget '{budget.name}' has reached {percentage_used}% of its limit (रू {spent_amount} of रू {budget.amount})"
+                    message=f"Budget '{budget.name}' has reached {percentage_used}% of its limit ({spent_amount} of {budget.amount})"
                 )
-        
-        # Check if budget exceeded
-        if percentage_used > 100:
-            # Check if exceeded alert already exists
-            existing_exceeded = BudgetAlert.objects.filter(
-                budget=budget,
-                alert_type='EXCEEDED'
-            ).exists()
-            
-            if not existing_exceeded:
-                BudgetAlert.objects.create(
-                    budget=budget,
-                    alert_type='EXCEEDED',
-                    percentage=int(percentage_used),
-                    amount_spent=spent_amount,
-                    message=f"Budget '{budget.name}' has been exceeded! Spent रू {spent_amount} of रू {budget.amount} ({percentage_used}%)"
+                
+                # Create in-app notifications for threshold
+                from organizations.models import OrganizationMember
+                managers = OrganizationMember.objects.filter(
+                    organization=budget.organization,
+                    role__in=['OWNER', 'MANAGER']
                 )
+                for manager in managers:
+                    notify_budget_alert(manager.user, budget, spent_amount, percentage_used)
     
     @action(detail=False, methods=['get'])
     def summary(self, request):

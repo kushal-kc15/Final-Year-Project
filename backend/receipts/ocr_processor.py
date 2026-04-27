@@ -4,8 +4,7 @@ from decimal import Decimal
 import os
 import time
 
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 from PIL import Image
 
 
@@ -20,7 +19,9 @@ class OCRProcessor:
         # Get Gemini API key
         from decouple import config
         self.gemini_api_key = config('GEMINI_API_KEY')
-        self.client = genai.Client(api_key=self.gemini_api_key)
+        genai.configure(api_key=self.gemini_api_key)
+        # Use gemini-flash-latest (alias that points to available model)
+        self.model = genai.GenerativeModel('gemini-flash-latest')
         
         # Retry configuration
         self.max_retries = 3
@@ -76,11 +77,8 @@ Rules:
 - Return valid JSON only, no markdown formatting
 - If you cannot read something, use empty string or 0"""
 
-                # Call Gemini API
-                response = self.client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=[prompt, img]
-                )
+                # Call Gemini API with old package (more stable)
+                response = self.model.generate_content([prompt, img])
                 
                 # Parse response
                 import json

@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'analytics',
     'activity_logs',
     'receipts',
+    'notifications',
 ]
 
 # Custom User Model

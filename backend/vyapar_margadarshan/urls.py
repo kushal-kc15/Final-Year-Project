@@ -27,4 +27,7 @@ urlpatterns = [
     
     # Receipts endpoints
     path('api/receipts/', include('receipts.urls')),
+    
+    # Notifications endpoints
+    path('api/notifications/', include('notifications.urls')),
 ]

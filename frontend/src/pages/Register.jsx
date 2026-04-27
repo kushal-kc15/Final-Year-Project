@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import authService from '../services/authService';
 
@@ -20,11 +20,39 @@ function Register() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showPassword2, setShowPassword2] = useState(false);
   const [step, setStep] = useState(1); // 2-step form
+  const [passwordStrength, setPasswordStrength] = useState(null);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    
+    // Auto-generate username from email
+    if (name === 'email') {
+      const username = value.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+      setFormData(prev => ({ ...prev, email: value, username }));
+    }
   };
+
+  // Check password strength in real-time
+  useEffect(() => {
+    if (formData.password && formData.password.length > 0) {
+      const checkStrength = async () => {
+        try {
+          const result = await authService.checkPasswordStrength(formData.password);
+          setPasswordStrength(result);
+        } catch (err) {
+          console.error('Failed to check password strength:', err);
+        }
+      };
+      const timer = setTimeout(checkStrength, 300);
+      return () => clearTimeout(timer);
+    } else {
+      setPasswordStrength(null);
+    }
+  }, [formData.password]);
 
   const handleNext = (e) => {
     e.preventDefault();
@@ -35,29 +63,33 @@ function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
     if (formData.password !== formData.password2) {
       setError('Passwords do not match.');
       return;
     }
+    
+    if (passwordStrength && passwordStrength.score < 2) {
+      setError('Password is too weak. Please choose a stronger password.');
+      return;
+    }
+    
     setLoading(true);
     try {
-      await authService.register(formData);
-      await authService.login({ username: formData.username, password: formData.password });
-      
-      // If there's an invitation token, redirect to accept page (FORCE RELOAD)
-      if (inviteToken) {
-        window.location.href = `/invite?token=${inviteToken}`;
-      } else {
-        // New user creates organization
-        window.location.href = '/setup';
-      }
+      const response = await authService.register(formData);
+      setRegistrationSuccess(true);
+      // Don't auto-login, user needs to verify email first
     } catch (err) {
       const errorData = err.response?.data;
       if (errorData) {
-        const msg = Object.entries(errorData)
-          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-          .join('\n');
-        setError(msg);
+        if (errorData.error && errorData.feedback) {
+          setError(`${errorData.error}\n${errorData.feedback.join('\n')}`);
+        } else {
+          const msg = Object.entries(errorData)
+            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+            .join('\n');
+          setError(msg);
+        }
       } else {
         setError('Registration failed. Please try again.');
       }
@@ -69,6 +101,62 @@ function Register() {
   // Shared input style
   const inputClass = "w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition-all text-slate-900 placeholder:text-slate-400";
   const labelClass = "block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5";
+
+  // Password strength colors
+  const strengthColors = {
+    0: 'bg-red-500',
+    1: 'bg-orange-500',
+    2: 'bg-yellow-500',
+    3: 'bg-lime-500',
+    4: 'bg-green-500'
+  };
+
+  const strengthLabels = {
+    0: 'Very Weak',
+    1: 'Weak',
+    2: 'Fair',
+    3: 'Strong',
+    4: 'Very Strong'
+  };
+
+  // If registration successful, show success message
+  if (registrationSuccess) {
+    return (
+      <div className="min-h-screen font-body flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden bg-slate-50">
+        <div className="absolute inset-0 dot-grid opacity-50" />
+        <div className="absolute top-[-80px] right-[-80px] w-96 h-96 bg-brand-100 rounded-full blur-3xl opacity-60 pointer-events-none" />
+        <div className="absolute bottom-[-60px] left-[-60px] w-72 h-72 bg-indigo-100 rounded-full blur-3xl opacity-50 pointer-events-none" />
+
+        <div className="relative w-full max-w-[440px] bg-white rounded-2xl border border-slate-200 shadow-float p-8 z-10 text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="material-icons text-green-600 text-3xl">mark_email_read</span>
+          </div>
+          <h1 className="font-display text-2xl font-700 text-slate-900 mb-2">
+            Check your email
+          </h1>
+          <p className="text-sm text-slate-600 mb-6">
+            We've sent a verification link to <strong>{formData.email}</strong>. 
+            Please check your inbox and click the link to verify your account.
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-left">
+            <p className="text-xs text-blue-900 font-semibold mb-2">📧 Didn't receive the email?</p>
+            <ul className="text-xs text-blue-800 space-y-1 ml-4 list-disc">
+              <li>Check your spam or junk folder</li>
+              <li>Make sure you entered the correct email</li>
+              <li>Wait a few minutes and check again</li>
+            </ul>
+          </div>
+          <Link
+            to="/login"
+            className="inline-flex items-center justify-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors text-sm"
+          >
+            Go to Login
+            <span className="material-icons text-sm">arrow_forward</span>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen font-body flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden bg-slate-50">
@@ -183,22 +271,6 @@ function Register() {
             </div>
 
             <div>
-              <label className={labelClass}>Username</label>
-              <div className="relative">
-                <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">person_outline</span>
-                <input
-                  name="username"
-                  type="text"
-                  required
-                  value={formData.username}
-                  onChange={handleChange}
-                  placeholder="ramsharma"
-                  className={inputClass}
-                />
-              </div>
-            </div>
-
-            <div>
               <label className={labelClass}>Email address</label>
               <div className="relative">
                 <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">mail_outline</span>
@@ -212,6 +284,7 @@ function Register() {
                   className={inputClass}
                 />
               </div>
+              <p className="text-xs text-slate-500 mt-1.5">You'll use this email to sign in</p>
             </div>
 
             <button
@@ -285,6 +358,43 @@ function Register() {
                   </span>
                 </button>
               </div>
+              
+              {/* Password strength indicator */}
+              {passwordStrength && (
+                <div className="mt-2">
+                  <div className="flex gap-1 mb-1.5">
+                    {[0, 1, 2, 3, 4].map((level) => (
+                      <div
+                        key={level}
+                        className={`h-1 flex-1 rounded-full transition-colors ${
+                          level <= passwordStrength.score
+                            ? strengthColors[passwordStrength.score]
+                            : 'bg-slate-200'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs font-semibold ${
+                      passwordStrength.score < 2 ? 'text-red-600' :
+                      passwordStrength.score === 2 ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`}>
+                      {strengthLabels[passwordStrength.score]}
+                    </span>
+                  </div>
+                  {passwordStrength.feedback && passwordStrength.feedback.length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5">
+                      {passwordStrength.feedback.map((tip, idx) => (
+                        <li key={idx} className="text-xs text-slate-600 flex items-start gap-1">
+                          <span className="material-icons text-[12px] text-slate-400 mt-0.5">info</span>
+                          {tip}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
@@ -293,14 +403,29 @@ function Register() {
                 <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">lock_outline</span>
                 <input
                   name="password2"
-                  type="password"
+                  type={showPassword2 ? 'text' : 'password'}
                   required
                   value={formData.password2}
                   onChange={handleChange}
                   placeholder="Repeat your password"
-                  className={inputClass}
+                  className={`${inputClass} pr-10`}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword2(!showPassword2)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <span className="material-icons text-[18px]">
+                    {showPassword2 ? 'visibility' : 'visibility_off'}
+                  </span>
+                </button>
               </div>
+              {formData.password2 && formData.password !== formData.password2 && (
+                <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
+                  <span className="material-icons text-[12px]">error</span>
+                  Passwords do not match
+                </p>
+              )}
             </div>
 
             <div className="flex gap-3 mt-2">

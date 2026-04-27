@@ -3,15 +3,29 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+from datetime import timedelta
 from .serializers import RegisterSerializer, UserSerializer
+from .auth_utils import generate_token, send_verification_email, check_password_strength
 
 User = get_user_model()
 
 
+def get_client_ip(request):
+    """Get client IP address from request"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+
 class RegisterView(generics.CreateAPIView):
     """
-    User registration endpoint.
+    User registration endpoint with email verification.
     POST /api/auth/register/
     """
     queryset = User.objects.all()
@@ -21,12 +35,121 @@ class RegisterView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        # Check password strength
+        password = request.data.get('password')
+        strength = check_password_strength(password)
+        if strength['score'] < 2:
+            return Response(
+                {
+                    'error': 'Password is too weak',
+                    'feedback': strength['feedback']
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         user = serializer.save()
+        
+        # Generate verification token
+        token = generate_token()
+        user.email_verification_token = token
+        user.save()
+        
+        # Send verification email
+        send_verification_email(user, token)
         
         return Response({
             'user': UserSerializer(user).data,
-            'message': 'User registered successfully'
+            'message': 'User registered successfully. Please check your email to verify your account.'
         }, status=status.HTTP_201_CREATED)
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Custom login view with email, rate limiting, and remember me
+    """
+    def post(self, request, *args, **kwargs):
+        email = request.data.get('email')
+        password = request.data.get('password')
+        remember_me = request.data.get('remember_me', False)
+        
+        if not email or not password:
+            return Response(
+                {'error': 'Email and password are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(email=email)
+            
+            # Check if account is locked
+            if user.account_locked_until and timezone.now() < user.account_locked_until:
+                remaining = (user.account_locked_until - timezone.now()).seconds // 60
+                return Response(
+                    {'error': f'Account is locked due to multiple failed login attempts. Try again in {remaining} minutes.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Verify password
+            if not user.check_password(password):
+                user.failed_login_attempts += 1
+                
+                # Lock account after 5 failed attempts for 15 minutes
+                if user.failed_login_attempts >= 5:
+                    user.account_locked_until = timezone.now() + timedelta(minutes=15)
+                    user.save()
+                    return Response(
+                        {'error': 'Account locked due to multiple failed login attempts. Try again in 15 minutes.'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+                
+                user.save()
+                
+                attempts_left = 5 - user.failed_login_attempts
+                return Response(
+                    {
+                        'error': 'Invalid email or password',
+                        'attempts_left': attempts_left
+                    },
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Check if email is verified
+            if not user.email_verified:
+                return Response(
+                    {
+                        'error': 'Please verify your email before logging in. Check your inbox for the verification link.',
+                        'email_not_verified': True,
+                        'email': user.email
+                    },
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Reset failed login attempts
+            user.failed_login_attempts = 0
+            user.account_locked_until = None
+            user.last_login_ip = get_client_ip(request)
+            user.save()
+            
+            # Generate JWT tokens
+            refresh = RefreshToken.for_user(user)
+            
+            # Extend token lifetime if remember_me is True (30 days instead of 7)
+            if remember_me:
+                refresh.set_exp(lifetime=timedelta(days=30))
+            
+            return Response({
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'user': UserSerializer(user).data,
+                'message': 'Login successful'
+            })
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Invalid email or password'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
 
 class CurrentUserView(generics.RetrieveAPIView):

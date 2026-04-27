@@ -9,6 +9,7 @@ from datetime import timedelta
 from .models import Expense
 from .serializers import ExpenseSerializer
 from activity_logs.utils import log_activity
+from notifications.utils import notify_expense_approved, notify_expense_rejected, notify_pending_approval
 
 
 class ExpenseViewSet(viewsets.ModelViewSet):
@@ -63,6 +64,12 @@ class ExpenseViewSet(viewsets.ModelViewSet):
                 description=f"{user.get_full_name()} created expense: {expense.title} (रू {expense.amount})",
                 metadata={'expense_id': expense.id, 'status': 'PENDING'}
             )
+            # Notify managers about pending approval
+            managers = OrganizationMember.objects.filter(
+                organization=member.organization,
+                role__in=['OWNER', 'MANAGER']
+            )
+            notify_pending_approval(managers, expense)
         else:
             # Owner/Manager expenses are auto-approved
             if member:
@@ -71,6 +78,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
                     organization=member.organization,
                     status='APPROVED'
                 )
+                # Check budgets for auto-approved expenses
+                self.check_budgets_for_expense(expense)
                 # Log activity
                 log_activity(
                     organization=member.organization,
@@ -82,6 +91,25 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             else:
                 # User without organization (shouldn't happen, but handle it)
                 serializer.save(user=user, status='APPROVED')
+    
+    def check_budgets_for_expense(self, expense):
+        """Check if expense causes any budget to exceed and trigger alerts"""
+        from budgets.models import Budget
+        from budgets.views import BudgetViewSet
+        
+        # Find active budgets for this category and organization
+        budgets = Budget.objects.filter(
+            organization=expense.organization,
+            category=expense.category,
+            is_active=True,
+            start_date__lte=expense.date,
+            end_date__gte=expense.date
+        )
+        
+        # Check each budget
+        budget_viewset = BudgetViewSet()
+        for budget in budgets:
+            budget_viewset.check_budget_alerts(budget)
     
     @action(detail=False, methods=['get'])
     def dashboard_metrics(self, request):
@@ -301,6 +329,12 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         expense.status = 'APPROVED'
         expense.save()
         
+        # Check budgets after approval
+        self.check_budgets_for_expense(expense)
+        
+        # Notify expense owner
+        notify_expense_approved(expense, user)
+        
         # Log activity
         log_activity(
             organization=member.organization,
@@ -357,6 +391,9 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         # Note: We'll add rejection_reason field to model later if needed
         # For now, just change status
         expense.save()
+        
+        # Notify expense owner
+        notify_expense_rejected(expense, user, rejection_reason)
         
         # Log activity
         log_activity(
