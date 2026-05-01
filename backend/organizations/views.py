@@ -51,15 +51,15 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         """Create an invitation to join the organization"""
         organization = self.get_object()
         
-        # Check if user is OWNER or MANAGER
+        # Check if user is OWNER
         member = OrganizationMember.objects.filter(
             organization=organization,
             user=request.user
         ).first()
         
-        if not member or member.role not in ['OWNER', 'MANAGER']:
+        if not member or member.role != 'OWNER':
             return Response(
-                {'error': 'Only owners and managers can invite members'},
+                {'error': 'Only owners can invite members'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -230,6 +230,39 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             {'message': 'Member removed successfully'},
             status=status.HTTP_200_OK
         )
+    
+    @action(detail=True, methods=['get'])
+    def statistics(self, request, pk=None):
+        """Get organization statistics"""
+        organization = self.get_object()
+        
+        # Member counts by role
+        members = organization.members.all()
+        owner_count = members.filter(role='OWNER').count()
+        staff_count = members.filter(role='STAFF').count()
+        
+        # Pending invitations
+        pending_invites = Invitation.objects.filter(
+            organization=organization,
+            status='PENDING'
+        ).count()
+        
+        # Recent activity (last 30 days)
+        from django.utils import timezone
+        from datetime import timedelta
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        
+        recent_members = members.filter(joined_at__gte=thirty_days_ago).count()
+        
+        return Response({
+            'total_members': members.count(),
+            'owner_count': owner_count,
+            'staff_count': staff_count,
+            'pending_invitations': pending_invites,
+            'recent_joins': recent_members,
+            'organization_name': organization.name,
+            'created_at': organization.created_at
+        })
 
 
 
@@ -238,11 +271,100 @@ class InvitationViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        # Return invitations for organizations where user is OWNER/MANAGER
+        # Return invitations for organizations where user is OWNER
         return Invitation.objects.filter(
             organization__members__user=self.request.user,
-            organization__members__role__in=['OWNER', 'MANAGER']
+            organization__members__role='OWNER'
         ).distinct()
+    
+    @action(detail=True, methods=['delete'])
+    def cancel(self, request, pk=None):
+        """Cancel a pending invitation"""
+        try:
+            invitation = self.get_object()
+        except Invitation.DoesNotExist:
+            return Response(
+                {'error': 'Invitation not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if user has permission (OWNER only)
+        member = OrganizationMember.objects.filter(
+            organization=invitation.organization,
+            user=request.user,
+            role='OWNER'
+        ).first()
+        
+        if not member:
+            return Response(
+                {'error': 'Only owners can cancel invitations'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Only allow canceling pending invitations
+        if invitation.status != 'PENDING':
+            return Response(
+                {'error': 'Can only cancel pending invitations'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Delete the invitation
+        invitation.delete()
+        
+        return Response(
+            {'message': 'Invitation cancelled successfully'},
+            status=status.HTTP_200_OK
+        )
+    
+    @action(detail=True, methods=['post'])
+    def resend(self, request, pk=None):
+        """Resend invitation email"""
+        try:
+            invitation = self.get_object()
+        except Invitation.DoesNotExist:
+            return Response(
+                {'error': 'Invitation not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if user has permission (OWNER only)
+        member = OrganizationMember.objects.filter(
+            organization=invitation.organization,
+            user=request.user,
+            role='OWNER'
+        ).first()
+        
+        if not member:
+            return Response(
+                {'error': 'Only owners can resend invitations'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Only allow resending pending invitations
+        if invitation.status != 'PENDING':
+            return Response(
+                {'error': 'Can only resend pending invitations'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if invitation has expired
+        if invitation.expires_at < timezone.now():
+            # Extend expiration by 7 more days
+            invitation.expires_at = timezone.now() + timedelta(days=7)
+            invitation.save()
+        
+        # Resend invitation email
+        from .emails import send_invitation_email
+        email_sent = send_invitation_email(invitation, request)
+        
+        return Response(
+            {
+                'message': 'Invitation resent successfully',
+                'email_sent': email_sent,
+                'expires_at': invitation.expires_at
+            },
+            status=status.HTTP_200_OK
+        )
     
     @action(detail=False, methods=['post'])
     def accept(self, request):

@@ -26,7 +26,6 @@ class OrganizationMember(models.Model):
     """
     ROLE_CHOICES = [
         ('OWNER', 'Owner'),
-        ('MANAGER', 'Manager'),
         ('STAFF', 'Staff'),
     ]
     

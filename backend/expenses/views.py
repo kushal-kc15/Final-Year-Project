@@ -34,7 +34,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         member = OrganizationMember.objects.filter(user=user).first()
         
         if member and member.role in ['OWNER', 'MANAGER']:
-            # OWNER/MANAGER can see all organization expenses
+            # OWNER can see all organization expenses
             return Expense.objects.filter(organization=member.organization)
         else:
             # STAFF can only see their own expenses
@@ -64,14 +64,14 @@ class ExpenseViewSet(viewsets.ModelViewSet):
                 description=f"{user.get_full_name()} created expense: {expense.title} (रू {expense.amount})",
                 metadata={'expense_id': expense.id, 'status': 'PENDING'}
             )
-            # Notify managers about pending approval
-            managers = OrganizationMember.objects.filter(
+            # Notify owners about pending approval
+            owners = OrganizationMember.objects.filter(
                 organization=member.organization,
-                role__in=['OWNER', 'MANAGER']
+                role='OWNER'
             )
-            notify_pending_approval(managers, expense)
+            notify_pending_approval(owners, expense)
         else:
-            # Owner/Manager expenses are auto-approved
+            # Owner expenses are auto-approved
             if member:
                 expense = serializer.save(
                     user=user,
@@ -115,7 +115,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     def dashboard_metrics(self, request):
         """
         Calculate dashboard metrics:
-        - OWNER/MANAGER: Organization-wide metrics
+        - OWNER: Organization-wide metrics
         - STAFF: Personal metrics only
         """
         user = request.user
@@ -126,8 +126,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         member = OrganizationMember.objects.filter(user=user).first()
         
         # Determine which expenses to include
-        if member and member.role in ['OWNER', 'MANAGER']:
-            # OWNER/MANAGER see all organization expenses (only APPROVED)
+        if member and member.role == 'OWNER':
+            # OWNER sees all organization expenses (only APPROVED)
             base_filter = Q(organization=member.organization, status='APPROVED')
         else:
             # STAFF see only their own expenses
@@ -265,16 +265,16 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def pending_approvals(self, request):
-        """Get all pending expenses in the organization for approval (OWNER/MANAGER only)"""
+        """Get all pending expenses in the organization for approval (OWNER only)"""
         user = request.user
         
         # Get user's role
         from organizations.models import OrganizationMember
         member = OrganizationMember.objects.filter(user=user).first()
         
-        if not member or member.role not in ['OWNER', 'MANAGER']:
+        if not member or member.role != 'OWNER':
             return Response(
-                {'error': 'Only owners and managers can view pending approvals'},
+                {'error': 'Only owners can view pending approvals'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -289,16 +289,16 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
-        """Approve a pending expense (OWNER/MANAGER only)"""
+        """Approve a pending expense (OWNER only)"""
         user = request.user
         
         # Get user's role
         from organizations.models import OrganizationMember
         member = OrganizationMember.objects.filter(user=user).first()
         
-        if not member or member.role not in ['OWNER', 'MANAGER']:
+        if not member or member.role != 'OWNER':
             return Response(
-                {'error': 'Only owners and managers can approve expenses'},
+                {'error': 'Only owners can approve expenses'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -349,7 +349,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
-        """Reject a pending expense with reason (OWNER/MANAGER only)"""
+        """Reject a pending expense with reason (OWNER only)"""
         user = request.user
         rejection_reason = request.data.get('reason', '')
         
@@ -357,9 +357,9 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         from organizations.models import OrganizationMember
         member = OrganizationMember.objects.filter(user=user).first()
         
-        if not member or member.role not in ['OWNER', 'MANAGER']:
+        if not member or member.role != 'OWNER':
             return Response(
-                {'error': 'Only owners and managers can reject expenses'},
+                {'error': 'Only owners can reject expenses'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -417,8 +417,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         member = OrganizationMember.objects.filter(user=user).first()
         
         # Determine which expenses to include
-        if member and member.role in ['OWNER', 'MANAGER']:
-            # OWNER/MANAGER see all organization expenses (only APPROVED)
+        if member and member.role == 'OWNER':
+            # OWNER sees all organization expenses (only APPROVED)
             expenses = Expense.objects.filter(
                 organization=member.organization,
                 status='APPROVED',
@@ -457,3 +457,76 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             'total_spent': total_spent
         })
 
+
+    @action(detail=False, methods=['get'])
+    def export_csv(self, request):
+        """Export expenses to CSV"""
+        import csv
+        from django.http import HttpResponse
+        from datetime import datetime
+        
+        user = request.user
+        
+        # Get user's role
+        from organizations.models import OrganizationMember
+        member = OrganizationMember.objects.filter(user=user).first()
+        
+        # Determine which expenses to include
+        if member and member.role == 'OWNER':
+            expenses = Expense.objects.filter(organization=member.organization)
+        else:
+            expenses = Expense.objects.filter(user=user)
+        
+        # Apply filters from query params
+        status_filter = request.query_params.get('status')
+        category_filter = request.query_params.get('category')
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        
+        if status_filter:
+            expenses = expenses.filter(status=status_filter.upper())
+        if category_filter:
+            expenses = expenses.filter(category=category_filter.upper())
+        if date_from:
+            expenses = expenses.filter(date__gte=date_from)
+        if date_to:
+            expenses = expenses.filter(date__lte=date_to)
+        
+        # Order by date
+        expenses = expenses.order_by('-date', '-created_at')
+        
+        # Create CSV response
+        response = HttpResponse(content_type='text/csv')
+        filename = f'expenses_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        writer = csv.writer(response)
+        
+        # Write header
+        writer.writerow([
+            'Date',
+            'Title',
+            'Category',
+            'Vendor',
+            'Amount',
+            'Status',
+            'Description',
+            'Submitted By',
+            'Created At'
+        ])
+        
+        # Write data
+        for expense in expenses:
+            writer.writerow([
+                expense.date.strftime('%Y-%m-%d'),
+                expense.title,
+                expense.get_category_display(),
+                expense.vendor or '',
+                str(expense.amount),
+                expense.get_status_display(),
+                expense.description or '',
+                expense.user.get_full_name() or expense.user.username,
+                expense.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            ])
+        
+        return response

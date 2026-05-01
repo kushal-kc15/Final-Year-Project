@@ -59,7 +59,7 @@ class RegisterView(generics.CreateAPIView):
         send_verification_email(user, token)
         
         return Response({
-            'user': UserSerializer(user).data,
+            'user': UserSerializer(user, context={'request': request}).data,
             'message': 'User registered successfully. Please check your email to verify your account.'
         }, status=status.HTTP_201_CREATED)
 
@@ -141,7 +141,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             return Response({
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
-                'user': UserSerializer(user).data,
+                'user': UserSerializer(user, context={'request': request}).data,
                 'message': 'Login successful'
             })
             
@@ -161,6 +161,11 @@ class CurrentUserView(generics.RetrieveAPIView):
     
     def get_object(self):
         return self.request.user
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
 
 
 @api_view(['PUT', 'PATCH'])
@@ -194,7 +199,7 @@ def update_profile(request):
     user.save()
     
     return Response({
-        'user': UserSerializer(user).data,
+        'user': UserSerializer(user, context={'request': request}).data,
         'message': 'Profile updated successfully'
     })
 
@@ -281,8 +286,84 @@ def update_preferences(request):
     user.save()
     
     return Response({
-        'user': UserSerializer(user).data,
+        'user': UserSerializer(user, context={'request': request}).data,
         'message': 'Preferences updated successfully'
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_profile_picture(request):
+    """
+    Upload or update user profile picture.
+    POST /api/auth/upload-avatar/
+    """
+    user = request.user
+    
+    if 'profile_picture' not in request.FILES:
+        return Response(
+            {'error': 'No image file provided'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    profile_picture = request.FILES['profile_picture']
+    
+    # Validate file type
+    allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+    if profile_picture.content_type not in allowed_types:
+        return Response(
+            {'error': 'Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Validate file size (max 5MB)
+    if profile_picture.size > 5 * 1024 * 1024:
+        return Response(
+            {'error': 'File size too large. Maximum size is 5MB.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Delete old profile picture if exists
+    if user.profile_picture:
+        user.profile_picture.delete(save=False)
+    
+    # Save new profile picture
+    user.profile_picture = profile_picture
+    user.save()
+    
+    serializer = UserSerializer(user, context={'request': request})
+    
+    return Response({
+        'user': serializer.data,
+        'message': 'Profile picture uploaded successfully'
+    })
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_profile_picture(request):
+    """
+    Delete user profile picture.
+    DELETE /api/auth/delete-avatar/
+    """
+    user = request.user
+    
+    if not user.profile_picture:
+        return Response(
+            {'error': 'No profile picture to delete'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Delete the file
+    user.profile_picture.delete(save=False)
+    user.profile_picture = None
+    user.save()
+    
+    serializer = UserSerializer(user, context={'request': request})
+    
+    return Response({
+        'user': serializer.data,
+        'message': 'Profile picture deleted successfully'
     })
 
 
@@ -300,7 +381,7 @@ def export_user_data(request):
     expenses = Expense.objects.filter(user=user)
     
     export_data = {
-        'user': UserSerializer(user).data,
+        'user': UserSerializer(user, context={'request': request}).data,
         'expenses': ExpenseSerializer(expenses, many=True).data,
         'export_date': user.updated_at.isoformat(),
         'total_expenses': expenses.count()

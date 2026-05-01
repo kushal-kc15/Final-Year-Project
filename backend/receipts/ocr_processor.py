@@ -20,12 +20,30 @@ class OCRProcessor:
         from decouple import config
         self.gemini_api_key = config('GEMINI_API_KEY')
         genai.configure(api_key=self.gemini_api_key)
-        # Use gemini-flash-latest (alias that points to available model)
-        self.model = genai.GenerativeModel('gemini-flash-latest')
+        
+        # Try different model names in order of preference
+        self.model_names = [
+            'gemini-1.5-flash',
+            'gemini-1.5-pro',
+            'gemini-pro-vision',
+        ]
+        
+        self.model = None
+        for model_name in self.model_names:
+            try:
+                self.model = genai.GenerativeModel(model_name)
+                print(f"✓ Using Gemini model: {model_name}")
+                break
+            except Exception as e:
+                print(f"✗ Model {model_name} not available: {str(e)}")
+                continue
+        
+        if not self.model:
+            raise Exception("No Gemini models available. Please check your API key and quota.")
         
         # Retry configuration
-        self.max_retries = 3
-        self.retry_delay = 2  # seconds
+        self.max_retries = 2
+        self.retry_delay = 1  # seconds
     
     def extract_with_gemini(self):
         """
@@ -111,16 +129,24 @@ Rules:
                 last_error = e
                 error_str = str(e)
                 
+                # Check for quota exceeded
+                if '429' in error_str or 'quota' in error_str.lower():
+                    raise Exception("Gemini API quota exceeded. Please check your billing at https://makersuite.google.com/app/apikey")
+                
+                # Check for invalid API key
+                if '401' in error_str or '403' in error_str or 'API key' in error_str:
+                    raise Exception("Invalid Gemini API key. Please check your configuration.")
+                
                 # Check if it's a rate limit or high demand error
                 if '503' in error_str or 'UNAVAILABLE' in error_str or 'high demand' in error_str.lower():
                     if attempt < self.max_retries - 1:
                         wait_time = self.retry_delay * (2 ** attempt)  # Exponential backoff
-                        print(f"Gemini API unavailable (attempt {attempt + 1}/{self.max_retries}). Retrying in {wait_time} seconds...")
+                        print(f"⏳ Gemini API unavailable (attempt {attempt + 1}/{self.max_retries}). Retrying in {wait_time} seconds...")
                         time.sleep(wait_time)
                         continue
                 
                 # For other errors, don't retry
-                print(f"Gemini API error: {e}")
+                print(f"❌ Gemini API error: {e}")
                 break
         
         # If all retries failed

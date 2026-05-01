@@ -3,7 +3,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     RegisterView, CurrentUserView, update_profile, 
     change_password, update_preferences, export_user_data,
-    CustomTokenObtainPairView
+    CustomTokenObtainPairView, upload_profile_picture, delete_profile_picture
 )
 from .security_views import (
     resend_verification_email, verify_email,
@@ -33,6 +33,8 @@ urlpatterns = [
     
     # Profile management
     path('profile/', update_profile, name='update_profile'),
+    path('upload-avatar/', upload_profile_picture, name='upload_avatar'),
+    path('delete-avatar/', delete_profile_picture, name='delete_avatar'),
     path('change-password/', change_password, name='change_password'),
     path('preferences/', update_preferences, name='update_preferences'),
     path('export-data/', export_user_data, name='export_data'),

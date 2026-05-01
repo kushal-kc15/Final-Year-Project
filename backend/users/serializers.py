@@ -7,13 +7,23 @@ User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model (for responses)"""
+    profile_picture_url = serializers.SerializerMethodField()
     
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'business_name', 'phone_number', 
                   'first_name', 'last_name', 'default_currency', 'items_per_page',
-                  'theme_preference', 'created_at']
-        read_only_fields = ['id', 'created_at']
+                  'theme_preference', 'profile_picture', 'profile_picture_url', 'created_at']
+        read_only_fields = ['id', 'created_at', 'profile_picture_url']
+    
+    def get_profile_picture_url(self, obj):
+        """Get full URL for profile picture"""
+        if obj.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
 
 
 class RegisterSerializer(serializers.ModelSerializer):

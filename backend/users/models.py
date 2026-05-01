@@ -31,6 +31,12 @@ class User(AbstractUser):
         blank=True,
         help_text="Contact phone number"
     )
+    profile_picture = models.ImageField(
+        upload_to='profile_pictures/',
+        blank=True,
+        null=True,
+        help_text="User profile picture"
+    )
     
     # Preferences
     default_currency = models.CharField(

@@ -47,7 +47,8 @@ def create_notification(
 
 def notify_expense_approved(expense, approved_by):
     """Notify user when their expense is approved"""
-    return create_notification(
+    # Create in-app notification
+    notification = create_notification(
         user=expense.user,
         notification_type='EXPENSE_APPROVED',
         title='Expense Approved ✓',
@@ -58,6 +59,15 @@ def notify_expense_approved(expense, approved_by):
         related_object_id=expense.id,
         action_url='/expenses'
     )
+    
+    # Send email notification
+    from expenses.emails import send_expense_approval_email
+    try:
+        send_expense_approval_email(expense, approved_by)
+    except Exception as e:
+        print(f"Failed to send approval email: {e}")
+    
+    return notification
 
 
 def notify_expense_rejected(expense, rejected_by, reason=''):
@@ -66,7 +76,8 @@ def notify_expense_rejected(expense, rejected_by, reason=''):
     if reason:
         message += f' Reason: {reason}'
     
-    return create_notification(
+    # Create in-app notification
+    notification = create_notification(
         user=expense.user,
         notification_type='EXPENSE_REJECTED',
         title='Expense Rejected',
@@ -77,6 +88,15 @@ def notify_expense_rejected(expense, rejected_by, reason=''):
         related_object_id=expense.id,
         action_url='/expenses'
     )
+    
+    # Send email notification
+    from expenses.emails import send_expense_rejection_email
+    try:
+        send_expense_rejection_email(expense, rejected_by, reason)
+    except Exception as e:
+        print(f"Failed to send rejection email: {e}")
+    
+    return notification
 
 
 def notify_pending_approval(managers, expense):
