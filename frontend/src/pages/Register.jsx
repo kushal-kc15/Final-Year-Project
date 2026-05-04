@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import authService from '../services/authService';
+import Logo from '../components/Logo';
 
 function Register() {
   const navigate = useNavigate();
@@ -21,22 +22,39 @@ function Register() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
-  const [step, setStep] = useState(1); // 2-step form
+  const [step, setStep] = useState(1);
   const [passwordStrength, setPasswordStrength] = useState(null);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const slides = [
+    {
+      title: "Join thousands of businesses",
+      description: "Get started with Vyapar Margadarshan and take control of your business expenses. Free for 30 days, no credit card required.",
+      icon: "groups"
+    },
+    {
+      title: "Powerful Expense Tracking",
+      description: "Track all your business expenses in one place. Categorize, tag, and organize expenses effortlessly.",
+      icon: "trending_up"
+    },
+    {
+      title: "Team Collaboration",
+      description: "Invite team members, set approval workflows, and manage expenses together seamlessly.",
+      icon: "workspace_premium"
+    }
+  ];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
     
-    // Auto-generate username from email
     if (name === 'email') {
       const username = value.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
       setFormData(prev => ({ ...prev, email: value, username }));
     }
   };
 
-  // Check password strength in real-time
   useEffect(() => {
     if (formData.password && formData.password.length > 0) {
       const checkStrength = async () => {
@@ -78,7 +96,6 @@ function Register() {
     try {
       const response = await authService.register(formData);
       setRegistrationSuccess(true);
-      // Don't auto-login, user needs to verify email first
     } catch (err) {
       const errorData = err.response?.data;
       if (errorData) {
@@ -98,11 +115,6 @@ function Register() {
     }
   };
 
-  // Shared input style
-  const inputClass = "w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition-all text-slate-900 placeholder:text-slate-400";
-  const labelClass = "block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5";
-
-  // Password strength colors
   const strengthColors = {
     0: 'bg-red-500',
     1: 'bg-orange-500',
@@ -119,22 +131,17 @@ function Register() {
     4: 'Very Strong'
   };
 
-  // If registration successful, show success message
   if (registrationSuccess) {
     return (
-      <div className="min-h-screen font-body flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden bg-slate-50">
-        <div className="absolute inset-0 dot-grid opacity-50" />
-        <div className="absolute top-[-80px] right-[-80px] w-96 h-96 bg-brand-100 rounded-full blur-3xl opacity-60 pointer-events-none" />
-        <div className="absolute bottom-[-60px] left-[-60px] w-72 h-72 bg-indigo-100 rounded-full blur-3xl opacity-50 pointer-events-none" />
-
-        <div className="relative w-full max-w-[440px] bg-white rounded-2xl border border-slate-200 shadow-float p-8 z-10 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="material-icons text-green-600 text-3xl">mark_email_read</span>
           </div>
-          <h1 className="font-display text-2xl font-700 text-slate-900 mb-2">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
             Check your email
           </h1>
-          <p className="text-sm text-slate-600 mb-6">
+          <p className="text-sm text-gray-600 mb-6">
             We've sent a verification link to <strong>{formData.email}</strong>. 
             Please check your inbox and click the link to verify your account.
           </p>
@@ -148,7 +155,7 @@ function Register() {
           </div>
           <Link
             to="/login"
-            className="inline-flex items-center justify-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors text-sm"
+            className="inline-flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg transition-colors text-sm"
           >
             Go to Login
             <span className="material-icons text-sm">arrow_forward</span>
@@ -159,222 +166,181 @@ function Register() {
   }
 
   return (
-    <div className="min-h-screen font-body flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden bg-slate-50">
-
-      {/* Background */}
-      <div className="absolute inset-0 dot-grid opacity-50" />
-      <div className="absolute top-[-80px] right-[-80px] w-96 h-96 bg-brand-100 rounded-full blur-3xl opacity-60 pointer-events-none" />
-      <div className="absolute bottom-[-60px] left-[-60px] w-72 h-72 bg-indigo-100 rounded-full blur-3xl opacity-50 pointer-events-none" />
-
-      {/* Top bar */}
-      <div className="absolute top-0 left-0 right-0 h-14 flex items-center justify-between px-8">
-        <Link to="/" className="inline-flex items-center gap-2">
-          <div className="w-7 h-7 bg-brand-700 rounded-md flex items-center justify-center">
-            <span className="material-icons text-white text-xs">account_balance_wallet</span>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
+      
+      {/* Main Card Container */}
+      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden flex">
+        
+        {/* Left Side - Form */}
+        <div className="w-full lg:w-1/2 p-8 lg:p-12 flex flex-col justify-center">
+          
+          {/* Logo */}
+          <div className="mb-8">
+            <Link to="/">
+              <Logo className="w-12 h-12" />
+            </Link>
           </div>
-          <span className="font-display font-700 text-slate-800 text-sm tracking-tight">
-            Vyapar <span className="text-brand-700">Margadarshan</span>
-          </span>
-        </Link>
-        <p className="text-sm text-slate-500">
-          Already have an account?{' '}
-          <Link to="/login" className="text-brand-700 font-semibold hover:underline">
-            Sign in
-          </Link>
-        </p>
-      </div>
 
-      {/* Card */}
-      <div className="relative w-full max-w-[440px] bg-white rounded-2xl border border-slate-200 shadow-float p-8 z-10">
-
-        {inviteToken && (
-          <div className="mb-6 flex items-start gap-3 bg-brand-50 border border-brand-200 rounded-xl px-4 py-3">
-            <span className="material-icons text-brand-600 text-sm mt-0.5">mail</span>
-            <div>
-              <p className="text-sm font-bold text-brand-900">You've been invited to join an organization!</p>
-              <p className="text-xs text-brand-700 mt-0.5">
-                Create your account to accept the invitation.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="font-display text-2xl font-700 text-slate-900 mb-1.5">
-            Create your account
-          </h1>
-          <p className="text-sm text-slate-500">
-            Get your business finances under control in minutes.
-          </p>
-        </div>
-
-        {/* Step indicator */}
-        <div className="flex items-center gap-2 mb-7">
-          <div className={`flex items-center gap-1.5 text-xs font-semibold ${step === 1 ? 'text-brand-700' : 'text-slate-400'}`}>
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === 1 ? 'bg-brand-700 text-white' : step > 1 ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-              {step > 1 ? <span className="material-icons text-[10px]">check</span> : '1'}
-            </div>
-            Your info
-          </div>
-          <div className={`flex-1 h-px ${step > 1 ? 'bg-emerald-300' : 'bg-slate-200'}`} />
-          <div className={`flex items-center gap-1.5 text-xs font-semibold ${step === 2 ? 'text-brand-700' : 'text-slate-400'}`}>
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === 2 ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-400'}`}>
-              2
-            </div>
-            {inviteToken ? 'Password' : 'Business & password'}
-          </div>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div className="mb-5 flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-            <span className="material-icons text-red-500 text-sm mt-0.5">error_outline</span>
-            <p className="text-sm text-red-600 whitespace-pre-line">{error}</p>
-          </div>
-        )}
-
-        {/* ── Step 1 ── */}
-        {step === 1 && (
-          <form onSubmit={handleNext} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+          {inviteToken && (
+            <div className="mb-6 flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+              <span className="material-icons text-blue-600 text-lg mt-0.5">mail</span>
               <div>
-                <label className={labelClass}>First name</label>
-                <div className="relative">
-                  <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">badge</span>
+                <p className="text-sm font-semibold text-blue-900">You've been invited to join an organization!</p>
+                <p className="text-xs text-blue-700 mt-1">
+                  Create your account to accept the invitation.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Sign up
+            </h1>
+            <p className="text-base text-gray-600">
+              to access Vyapar Margadarshan
+            </p>
+          </div>
+
+          {/* Step indicator */}
+          <div className="flex items-center gap-2 mb-6">
+            <div className={`flex items-center gap-1.5 text-xs font-semibold ${step === 1 ? 'text-blue-600' : 'text-gray-400'}`}>
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === 1 ? 'bg-blue-600 text-white' : step > 1 ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                {step > 1 ? <span className="material-icons text-[10px]">check</span> : '1'}
+              </div>
+              Your info
+            </div>
+            <div className={`flex-1 h-px ${step > 1 ? 'bg-green-300' : 'bg-gray-200'}`} />
+            <div className={`flex items-center gap-1.5 text-xs font-semibold ${step === 2 ? 'text-blue-600' : 'text-gray-400'}`}>
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === 2 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                2
+              </div>
+              {inviteToken ? 'Password' : 'Business & password'}
+            </div>
+          </div>
+
+          {error && (
+            <div className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+              <span className="material-icons text-red-500 text-lg mt-0.5">error_outline</span>
+              <p className="text-sm text-red-700 whitespace-pre-line flex-1">{error}</p>
+            </div>
+          )}
+
+          {/* Step 1 */}
+          {step === 1 && (
+            <form onSubmit={handleNext} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
                   <input
                     name="first_name"
                     type="text"
                     required
                     value={formData.first_name}
                     onChange={handleChange}
-                    placeholder="Ram"
-                    className={inputClass}
+                    placeholder="First name"
+                    className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400"
                   />
                 </div>
-              </div>
-              <div>
-                <label className={labelClass}>Last name</label>
-                <div className="relative">
-                  <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">badge</span>
+                <div>
                   <input
                     name="last_name"
                     type="text"
                     required
                     value={formData.last_name}
                     onChange={handleChange}
-                    placeholder="Sharma"
-                    className={inputClass}
+                    placeholder="Last name"
+                    className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400"
                   />
                 </div>
               </div>
-            </div>
 
-            <div>
-              <label className={labelClass}>Email address</label>
-              <div className="relative">
-                <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">mail_outline</span>
+              <div>
                 <input
                   name="email"
                   type="email"
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="ram@business.com"
-                  className={inputClass}
+                  placeholder="Email address"
+                  className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400"
                 />
+                <p className="text-xs text-gray-500 mt-1.5">You'll use this email to sign in</p>
               </div>
-              <p className="text-xs text-slate-500 mt-1.5">You'll use this email to sign in</p>
-            </div>
 
-            <button
-              type="submit"
-              className="w-full mt-2 flex items-center justify-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm shadow-sm"
-            >
-              Continue
-              <span className="material-icons text-sm">arrow_forward</span>
-            </button>
-          </form>
-        )}
+              <button
+                type="submit"
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-semibold text-sm transition-colors"
+              >
+                Continue
+              </button>
+            </form>
+          )}
 
-        {/* ── Step 2 ── */}
-        {step === 2 && (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Only show business fields if NOT joining via invitation */}
-            {!inviteToken && (
-              <>
-                <div>
-                  <label className={labelClass}>Business name</label>
-                  <div className="relative">
-                    <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">storefront</span>
+          {/* Step 2 */}
+          {step === 2 && (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {!inviteToken && (
+                <>
+                  <div>
                     <input
                       name="business_name"
                       type="text"
                       value={formData.business_name}
                       onChange={handleChange}
-                      placeholder="Sharma Traders Pvt. Ltd."
-                      className={inputClass}
+                      placeholder="Business name (optional)"
+                      className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className={labelClass}>Phone number</label>
-                  <div className="relative">
-                    <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">phone</span>
+                  <div>
                     <input
                       name="phone_number"
                       type="tel"
                       value={formData.phone_number}
                       onChange={handleChange}
-                      placeholder="+977 98XXXXXXXX"
-                      className={inputClass}
+                      placeholder="Phone number (optional)"
+                      className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400"
                     />
                   </div>
-                </div>
-              </>
-            )}
+                </>
+              )}
 
-            <div>
-              <label className={labelClass}>Password</label>
-              <div className="relative">
-                <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">lock_outline</span>
-                <input
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Create a strong password"
-                  className={`${inputClass} pr-10`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  <span className="material-icons text-[18px]">
-                    {showPassword ? 'visibility' : 'visibility_off'}
-                  </span>
-                </button>
-              </div>
-              
-              {/* Password strength indicator */}
-              {passwordStrength && (
-                <div className="mt-2">
-                  <div className="flex gap-1 mb-1.5">
-                    {[0, 1, 2, 3, 4].map((level) => (
-                      <div
-                        key={level}
-                        className={`h-1 flex-1 rounded-full transition-colors ${
-                          level <= passwordStrength.score
-                            ? strengthColors[passwordStrength.score]
-                            : 'bg-slate-200'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between">
+              <div>
+                <div className="relative">
+                  <input
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Password"
+                    className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all pr-12 placeholder:text-gray-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <span className="material-icons text-lg">
+                      {showPassword ? 'visibility_off' : 'visibility'}
+                    </span>
+                  </button>
+                </div>
+                
+                {passwordStrength && (
+                  <div className="mt-2">
+                    <div className="flex gap-1 mb-1.5">
+                      {[0, 1, 2, 3, 4].map((level) => (
+                        <div
+                          key={level}
+                          className={`h-1 flex-1 rounded-full transition-colors ${
+                            level <= passwordStrength.score
+                              ? strengthColors[passwordStrength.score]
+                              : 'bg-gray-200'
+                          }`}
+                        />
+                      ))}
+                    </div>
                     <span className={`text-xs font-semibold ${
                       passwordStrength.score < 2 ? 'text-red-600' :
                       passwordStrength.score === 2 ? 'text-yellow-600' :
@@ -383,94 +349,129 @@ function Register() {
                       {strengthLabels[passwordStrength.score]}
                     </span>
                   </div>
-                  {passwordStrength.feedback && passwordStrength.feedback.length > 0 && (
-                    <ul className="mt-1.5 space-y-0.5">
-                      {passwordStrength.feedback.map((tip, idx) => (
-                        <li key={idx} className="text-xs text-slate-600 flex items-start gap-1">
-                          <span className="material-icons text-[12px] text-slate-400 mt-0.5">info</span>
-                          {tip}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            <div>
-              <label className={labelClass}>Confirm password</label>
-              <div className="relative">
-                <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">lock_outline</span>
-                <input
-                  name="password2"
-                  type={showPassword2 ? 'text' : 'password'}
-                  required
-                  value={formData.password2}
-                  onChange={handleChange}
-                  placeholder="Repeat your password"
-                  className={`${inputClass} pr-10`}
-                />
+              <div>
+                <div className="relative">
+                  <input
+                    name="password2"
+                    type={showPassword2 ? 'text' : 'password'}
+                    required
+                    value={formData.password2}
+                    onChange={handleChange}
+                    placeholder="Confirm password"
+                    className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all pr-12 placeholder:text-gray-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword2(!showPassword2)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <span className="material-icons text-lg">
+                      {showPassword2 ? 'visibility_off' : 'visibility'}
+                    </span>
+                  </button>
+                </div>
+                {formData.password2 && formData.password !== formData.password2 && (
+                  <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
+                    <span className="material-icons text-[12px]">error</span>
+                    Passwords do not match
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowPassword2(!showPassword2)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  onClick={() => setStep(1)}
+                  className="flex-1 border border-gray-300 text-gray-700 font-semibold py-3 rounded-lg hover:bg-gray-50 transition-colors text-sm"
                 >
-                  <span className="material-icons text-[18px]">
-                    {showPassword2 ? 'visibility' : 'visibility_off'}
-                  </span>
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Creating...' : 'Create account'}
                 </button>
               </div>
-              {formData.password2 && formData.password !== formData.password2 && (
-                <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
-                  <span className="material-icons text-[12px]">error</span>
-                  Passwords do not match
-                </p>
-              )}
+            </form>
+          )}
+
+          <p className="text-xs text-gray-600 mt-6">
+            Already have a Vyapar Margadarshan account?{' '}
+            <Link to="/login" className="text-blue-600 font-semibold hover:text-blue-700">
+              Sign in
+            </Link>
+          </p>
+        </div>
+
+        {/* Right Side - Illustration */}
+        <div className="hidden lg:flex lg:w-1/2 bg-white items-center justify-center p-8 border-l border-gray-100">
+          
+          <div className="max-w-sm text-center">
+            <div className="mb-6">
+              <div className="w-full h-56 bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl flex items-center justify-center relative overflow-hidden mb-6">
+                <div className="absolute top-3 left-3 right-3 h-6 bg-white/60 backdrop-blur-sm rounded-lg flex items-center px-2 gap-1.5">
+                  <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-400"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-400"></div>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col items-center">
+                  <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mb-4">
+                    <span className="material-icons text-white text-4xl">check_circle</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 bg-blue-400 rounded-full"></div>
+                    <div className="w-8 h-8 bg-indigo-400 rounded-full"></div>
+                    <div className="w-8 h-8 bg-purple-400 rounded-full"></div>
+                  </div>
+                  <div className="w-32 h-2 bg-green-200 rounded-full"></div>
+                </div>
+                
+                <div className="absolute top-12 left-6 w-9 h-9 bg-white rounded-full shadow-lg flex items-center justify-center">
+                  <span className="material-icons text-green-500 text-base">groups</span>
+                </div>
+                <div className="absolute top-12 right-6 w-9 h-9 bg-white rounded-full shadow-lg flex items-center justify-center">
+                  <span className="material-icons text-blue-500 text-base">trending_up</span>
+                </div>
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-9 h-9 bg-white rounded-full shadow-lg flex items-center justify-center">
+                  <span className="material-icons text-indigo-500 text-base">workspace_premium</span>
+                </div>
+              </div>
             </div>
 
-            <div className="flex gap-3 mt-2">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="flex-1 flex items-center justify-center gap-1.5 border border-slate-200 text-slate-600 font-semibold py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-sm"
-              >
-                <span className="material-icons text-sm">arrow_back</span>
-                Back
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 flex items-center justify-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    Create account
-                    <span className="material-icons text-sm">arrow_forward</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        )}
+            <h2 className="text-lg font-bold text-gray-900 mb-2">
+              {slides[currentSlide].title}
+            </h2>
+            <p className="text-sm text-gray-600 mb-4 leading-relaxed px-4">
+              {slides[currentSlide].description}
+            </p>
+            <button className="text-blue-600 font-semibold hover:text-blue-700 text-sm inline-flex items-center gap-1">
+              Learn more
+            </button>
 
-        {/* Sign in link */}
-        <p className="text-center text-sm text-slate-500 mt-6">
-          Already have an account?{' '}
-          <Link to="/login" className="text-brand-700 font-semibold hover:underline">
-            Sign in
-          </Link>
-        </p>
+            {/* Pagination dots */}
+            <div className="flex items-center justify-center gap-1.5 mt-6">
+              {slides.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentSlide(index)}
+                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                    currentSlide === index ? 'bg-blue-600' : 'bg-gray-300 hover:bg-gray-400'
+                  }`}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
-
-      {/* Bottom */}
-      <p className="relative z-10 mt-6 text-xs text-slate-400 text-center">
-        Free for 30 days · No credit card required
-      </p>
     </div>
   );
 }

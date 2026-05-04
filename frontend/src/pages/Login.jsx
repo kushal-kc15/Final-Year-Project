@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import authService from '../services/authService';
+import Logo from '../components/Logo';
 
 function Login() {
   const navigate = useNavigate();
@@ -13,6 +14,25 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [emailNotVerified, setEmailNotVerified] = useState(false);
   const [attemptsLeft, setAttemptsLeft] = useState(null);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const slides = [
+    {
+      title: "Passwordless sign-in",
+      description: "Move away from risky passwords and experience one-tap access to Vyapar Margadarshan. Download and install OneAuth.",
+      icon: "fingerprint"
+    },
+    {
+      title: "Smart Receipt Scanning",
+      description: "Automatically extract data from receipts with AI-powered OCR technology. Save time and reduce errors.",
+      icon: "receipt_long"
+    },
+    {
+      title: "Real-time Analytics",
+      description: "Get instant insights into spending patterns and budget usage with powerful analytics dashboard.",
+      icon: "analytics"
+    }
+  ];
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -45,11 +65,9 @@ function Login() {
     try {
       await authService.login(formData);
 
-      // If there's an invitation token, redirect to accept page
       if (inviteToken) {
         window.location.href = `/invite?token=${inviteToken}`;
       } else {
-        // ✅ FORCE RELOAD so auth state updates
         window.location.href = '/dashboard';
       }
 
@@ -71,104 +89,81 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen font-body flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden bg-slate-50">
-
-      <div className="absolute inset-0 dot-grid opacity-50" />
-
-      <div className="absolute top-[-80px] right-[-80px] w-96 h-96 bg-brand-100 rounded-full blur-3xl opacity-60 pointer-events-none" />
-      <div className="absolute bottom-[-60px] left-[-60px] w-72 h-72 bg-indigo-100 rounded-full blur-3xl opacity-50 pointer-events-none" />
-
-      <div className="absolute top-0 left-0 right-0 h-14 flex items-center justify-between px-8">
-        <Link to="/" className="inline-flex items-center gap-2 group">
-          <div className="w-7 h-7 bg-brand-700 rounded-md flex items-center justify-center">
-            <span className="material-icons text-white text-xs">account_balance_wallet</span>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
+      
+      {/* Main Card Container */}
+      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden flex">
+        
+        {/* Left Side - Form */}
+        <div className="w-full lg:w-1/2 p-8 lg:p-12 flex flex-col justify-center">
+          
+          {/* Logo */}
+          <div className="mb-8">
+            <Link to="/">
+              <Logo className="w-12 h-12" />
+            </Link>
           </div>
-          <span className="font-display font-700 text-slate-800 text-sm tracking-tight">
-            Vyapar <span className="text-brand-700">Margadarshan</span>
-          </span>
-        </Link>
-        <p className="text-sm text-slate-500">
-          No account?{' '}
-          <Link to="/register" className="text-brand-700 font-semibold hover:underline">
-            Sign up free
-          </Link>
-        </p>
-      </div>
 
-      <div className="relative w-full max-w-[420px] bg-white rounded-2xl border border-slate-200 shadow-float p-8 z-10">
-
-        {inviteToken && (
-          <div className="mb-6 flex items-start gap-3 bg-brand-50 border border-brand-200 rounded-xl px-4 py-3">
-            <span className="material-icons text-brand-600 text-sm mt-0.5">mail</span>
-            <div>
-              <p className="text-sm font-bold text-brand-900">You've been invited!</p>
-              <p className="text-xs text-brand-700 mt-0.5">
-                Don't have an account?{' '}
-                <Link to={`/register?invite=${inviteToken}`} className="font-semibold underline">
-                  Create one here
-                </Link>
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className="mb-8">
-          <h1 className="font-display text-2xl font-700 text-slate-900 mb-1.5">
-            Welcome back
-          </h1>
-          <p className="text-sm text-slate-500">
-            Sign in to your workspace to continue
-          </p>
-        </div>
-
-        {error && (
-          <div className="mb-5 flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-            <span className="material-icons text-red-500 text-sm mt-0.5">error_outline</span>
-            <div className="flex-1">
-              <p className="text-sm text-red-600">{error}</p>
-              {attemptsLeft !== null && attemptsLeft > 0 && (
-                <p className="text-xs text-red-500 mt-1">
-                  {attemptsLeft} {attemptsLeft === 1 ? 'attempt' : 'attempts'} remaining before account lockout
+          {inviteToken && (
+            <div className="mb-6 flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+              <span className="material-icons text-blue-600 text-lg mt-0.5">mail</span>
+              <div>
+                <p className="text-sm font-semibold text-blue-900">You've been invited!</p>
+                <p className="text-xs text-blue-700 mt-1">
+                  Don't have an account?{' '}
+                  <Link to={`/register?invite=${inviteToken}`} className="font-semibold underline hover:text-blue-800">
+                    Create one here
+                  </Link>
                 </p>
-              )}
-              {emailNotVerified && (
-                <button
-                  onClick={handleResendVerification}
-                  className="text-xs text-red-700 font-semibold underline mt-2"
-                >
-                  Resend verification email
-                </button>
-              )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-              Email Address
-            </label>
-            <input
-              name="email"
-              type="email"
-              required
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="you@company.com"
-              className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-            />
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Sign in
+            </h1>
+            <p className="text-base text-gray-600">
+              to access Vyapar Margadarshan
+            </p>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                Password
-              </label>
-              <Link to="/forgot-password" className="text-xs text-brand-700 font-semibold hover:underline">
-                Forgot?
-              </Link>
+          {error && (
+            <div className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+              <span className="material-icons text-red-500 text-lg mt-0.5">error_outline</span>
+              <div className="flex-1">
+                <p className="text-sm text-red-700 font-medium">{error}</p>
+                {attemptsLeft !== null && attemptsLeft > 0 && (
+                  <p className="text-xs text-red-600 mt-1.5">
+                    {attemptsLeft} {attemptsLeft === 1 ? 'attempt' : 'attempts'} remaining before account lockout
+                  </p>
+                )}
+                {emailNotVerified && (
+                  <button
+                    onClick={handleResendVerification}
+                    className="text-xs text-red-700 font-semibold underline mt-2 hover:text-red-800"
+                  >
+                    Resend verification email
+                  </button>
+                )}
+              </div>
             </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+
+            <div>
+              <input
+                name="email"
+                type="email"
+                required
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Email address or mobile number"
+                className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400"
+              />
+            </div>
+
             <div className="relative">
               <input
                 name="password"
@@ -176,50 +171,140 @@ function Login() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="Enter your password"
-                className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all pr-10"
+                placeholder="Password"
+                className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all pr-12 placeholder:text-gray-400"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                <span className="material-icons text-[18px]">
+                <span className="material-icons text-lg">
                   {showPassword ? 'visibility_off' : 'visibility'}
                 </span>
               </button>
             </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Signing in...' : 'Next'}
+            </button>
+          </form>
+
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm font-semibold text-gray-700">Sign in using</div>
+              <Link to="/forgot-password" className="text-sm text-blue-600 font-semibold hover:text-blue-700">
+                Forgot password?
+              </Link>
+            </div>
+            
+            <div className="flex items-center gap-2 flex-wrap">
+              <button type="button" className="w-10 h-10 bg-gray-900 hover:bg-gray-800 rounded-lg flex items-center justify-center transition-colors">
+                <span className="material-icons text-white text-lg">apple</span>
+              </button>
+              <button type="button" className="w-10 h-10 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg flex items-center justify-center transition-colors">
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+              </button>
+              
+             
+              <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-lg text-gray-400">
+                <span className="material-icons text-lg">more_horiz</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              name="remember_me"
-              id="remember_me"
-              checked={formData.remember_me}
-              onChange={handleChange}
-              className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500"
-            />
-            <label htmlFor="remember_me" className="ml-2 text-sm text-slate-600">
-              Remember me for 30 days
-            </label>
+          <p className="text-xs text-gray-600 mt-6">
+            Don't have a Vyapar Margadarshan account?{' '}
+            <Link to="/register" className="text-blue-600 font-semibold hover:text-blue-700">
+              Sign up now
+            </Link>
+          </p>
+        </div>
+
+        {/* Right Side - Illustration */}
+        <div className="hidden lg:flex lg:w-1/2 bg-white items-center justify-center p-8 border-l border-gray-100">
+          
+          <div className="max-w-sm text-center">
+            {/* Illustration */}
+            <div className="mb-6">
+              <div className="w-full h-56 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl flex items-center justify-center relative overflow-hidden mb-6">
+                {/* Browser window mockup */}
+                <div className="absolute top-3 left-3 right-3 h-6 bg-white/60 backdrop-blur-sm rounded-lg flex items-center px-2 gap-1.5">
+                  <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-400"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-400"></div>
+                  </div>
+                </div>
+                
+                {/* People illustrations */}
+                <div className="flex items-center justify-around w-full px-6 mt-4">
+                  <div className="flex flex-col items-center">
+                    <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mb-1.5">
+                      <span className="material-icons text-white text-xl">person</span>
+                    </div>
+                    <div className="w-14 h-2 bg-blue-200 rounded-full"></div>
+                  </div>
+                  
+                  <div className="flex items-center justify-center">
+                    <span className="material-icons text-blue-500 text-3xl">arrow_forward</span>
+                  </div>
+                  
+                  <div className="flex flex-col items-center">
+                    <div className="w-12 h-12 bg-indigo-500 rounded-full flex items-center justify-center mb-1.5">
+                      <span className="material-icons text-white text-xl">receipt_long</span>
+                    </div>
+                    <div className="w-14 h-2 bg-indigo-200 rounded-full"></div>
+                  </div>
+                </div>
+                
+                {/* Security icons */}
+                <div className="absolute top-10 left-5 w-9 h-9 bg-white rounded-full shadow-lg flex items-center justify-center">
+                  <span className="material-icons text-blue-500 text-base">search</span>
+                </div>
+                <div className="absolute top-10 right-5 w-9 h-9 bg-white rounded-full shadow-lg flex items-center justify-center">
+                  <span className="material-icons text-indigo-500 text-base">fingerprint</span>
+                </div>
+                <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-9 h-9 bg-white rounded-full shadow-lg flex items-center justify-center">
+                  <span className="material-icons text-blue-500 text-base">verified_user</span>
+                </div>
+              </div>
+            </div>
+
+            <h2 className="text-lg font-bold text-gray-900 mb-2">
+              {slides[currentSlide].title}
+            </h2>
+            <p className="text-sm text-gray-600 mb-4 leading-relaxed px-4">
+              {slides[currentSlide].description}
+            </p>
+            <button className="text-blue-600 font-semibold hover:text-blue-700 text-sm inline-flex items-center gap-1">
+              Learn more
+            </button>
+
+            {/* Pagination dots */}
+            <div className="flex items-center justify-center gap-1.5 mt-6">
+              {slides.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentSlide(index)}
+                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                    currentSlide === index ? 'bg-blue-600' : 'bg-gray-300 hover:bg-gray-400'
+                  }`}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-brand-700 hover:bg-brand-800 text-white py-2.5 rounded-xl font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-slate-500 mt-6">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-brand-700 font-semibold hover:underline">
-            Create one
-          </Link>
-        </p>
+        </div>
       </div>
     </div>
   );
