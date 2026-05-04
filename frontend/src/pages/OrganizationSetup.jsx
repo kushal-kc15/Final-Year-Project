@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import Logo from '../components/Logo';
 
 function OrganizationSetup() {
   const navigate = useNavigate();
@@ -60,42 +61,34 @@ function OrganizationSetup() {
   };
 
   const inputClass =
-    'w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition-all text-slate-900 placeholder:text-slate-400';
-  const labelClass = 'block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5';
+    'w-full pl-10 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400';
+  const labelClass = 'block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5';
 
   const roleColors = {
-    STAFF: 'bg-slate-100 text-slate-600',
-    MANAGER: 'bg-blue-50 text-brand-700',
-    OWNER: 'bg-brand-50 text-brand-800',
+    STAFF: 'bg-gray-100 text-gray-600',
+    OWNER: 'bg-blue-50 text-blue-800',
   };
 
   return (
-    <div className="min-h-screen font-body flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden bg-slate-50">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden bg-gray-50" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
 
       {/* Background */}
       <div className="absolute inset-0 dot-grid opacity-50" />
-      <div className="absolute top-[-80px] right-[-80px] w-96 h-96 bg-brand-100 rounded-full blur-3xl opacity-60 pointer-events-none" />
-      <div className="absolute bottom-[-60px] left-[-60px] w-72 h-72 bg-indigo-100 rounded-full blur-3xl opacity-50 pointer-events-none" />
+      <div className="absolute top-[-80px] right-[-80px] w-96 h-96 bg-blue-100 rounded-full blur-3xl opacity-40 pointer-events-none" />
+      <div className="absolute bottom-[-60px] left-[-60px] w-72 h-72 bg-indigo-100 rounded-full blur-3xl opacity-30 pointer-events-none" />
 
       {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 h-14 flex items-center px-8">
-        <div className="inline-flex items-center gap-2">
-          <div className="w-7 h-7 bg-brand-700 rounded-md flex items-center justify-center">
-            <span className="material-icons text-white text-xs">account_balance_wallet</span>
-          </div>
-          <span className="font-display font-700 text-slate-800 text-sm tracking-tight">
-            Vyapar <span className="text-brand-700">Margadarshan</span>
-          </span>
-        </div>
+        <Logo className="w-10 h-10" />
       </div>
 
       {/* Card */}
-      <div className="relative w-full max-w-[480px] bg-white rounded-2xl border border-slate-200 shadow-float z-10 overflow-hidden">
+      <div className="relative w-full max-w-[480px] bg-white rounded-xl border border-gray-200 shadow-lg z-10 overflow-hidden">
 
         {/* Progress bar */}
-        <div className="h-1 bg-slate-100">
+        <div className="h-1 bg-gray-100">
           <div
-            className="h-full bg-brand-700 transition-all duration-500"
+            className="h-full bg-gray-900 transition-all duration-500"
             style={{ width: step === 1 ? '50%' : '100%' }}
           />
         </div>
@@ -113,18 +106,18 @@ function OrganizationSetup() {
                     step > s.n
                       ? 'bg-emerald-500 text-white'
                       : step === s.n
-                      ? 'bg-brand-700 text-white'
-                      : 'bg-slate-100 text-slate-400'
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-100 text-gray-400'
                   }`}>
                     {step > s.n
                       ? <span className="material-icons text-[11px]">check</span>
                       : s.n}
                   </div>
-                  <span className={`text-xs font-semibold ${step === s.n ? 'text-slate-800' : 'text-slate-400'}`}>
+                  <span className={`text-xs font-semibold ${step === s.n ? 'text-gray-800' : 'text-gray-400'}`}>
                     {s.label}
                   </span>
                 </div>
-                {i < 1 && <div className={`w-10 h-px ${step > 1 ? 'bg-emerald-300' : 'bg-slate-200'}`} />}
+                {i < 1 && <div className={`w-10 h-px ${step > 1 ? 'bg-emerald-300' : 'bg-gray-200'}`} />}
               </div>
             ))}
           </div>
@@ -133,10 +126,10 @@ function OrganizationSetup() {
           {step === 1 && (
             <>
               <div className="mb-7">
-                <h1 className="font-display text-2xl font-700 text-slate-900 mb-1.5">
+                <h1 className="text-2xl font-bold text-gray-900 mb-1.5">
                   Set up your organisation
                 </h1>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-gray-500">
                   This is your shared workspace for managing expenses.
                 </p>
               </div>
@@ -145,7 +138,7 @@ function OrganizationSetup() {
                 <div>
                   <label className={labelClass}>Organisation name *</label>
                   <div className="relative">
-                    <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+                    <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
                       business
                     </span>
                     <input
@@ -161,9 +154,9 @@ function OrganizationSetup() {
                 </div>
 
                 <div>
-                  <label className={labelClass}>Description <span className="normal-case text-slate-400 font-normal">(optional)</span></label>
+                  <label className={labelClass}>Description <span className="normal-case text-gray-400 font-normal">(optional)</span></label>
                   <div className="relative">
-                    <span className="material-icons absolute left-3 top-3 text-slate-400 text-[18px]">
+                    <span className="material-icons absolute left-3 top-3 text-gray-400 text-[18px]">
                       notes
                     </span>
                     <textarea
@@ -172,7 +165,7 @@ function OrganizationSetup() {
                       value={organizationData.description}
                       onChange={handleOrgChange}
                       placeholder="Brief description of your business..."
-                      className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition-all text-slate-900 placeholder:text-slate-400 resize-none"
+                      className="w-full pl-10 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 resize-none"
                     />
                   </div>
                 </div>
@@ -180,7 +173,7 @@ function OrganizationSetup() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-2 flex items-center justify-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm disabled:opacity-60 shadow-sm"
+                  className="w-full mt-2 flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm disabled:opacity-60 shadow-sm"
                 >
                   {loading ? (
                     <>
@@ -210,10 +203,10 @@ function OrganizationSetup() {
                     {createdOrg?.name} created!
                   </span>
                 </div>
-                <h1 className="font-display text-2xl font-700 text-slate-900 mb-1.5">
+                <h1 className="text-2xl font-bold text-gray-900 mb-1.5">
                   Invite your team
                 </h1>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-gray-500">
                   Add team members now or skip and do it later from settings.
                 </p>
               </div>
@@ -222,7 +215,7 @@ function OrganizationSetup() {
                 {invitations.map((inv, index) => (
                   <div key={index} className="flex gap-2 items-center">
                     <div className="relative flex-1">
-                      <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+                      <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
                         mail_outline
                       </span>
                       <input
@@ -237,10 +230,9 @@ function OrganizationSetup() {
                     <select
                       value={inv.role}
                       onChange={(e) => handleInvitationChange(index, 'role', e.target.value)}
-                      className={`px-3 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 bg-slate-50 transition-all cursor-pointer ${roleColors[inv.role]}`}
+                      className={`px-3 py-2.5 text-xs font-semibold border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-gray-50 transition-all cursor-pointer ${roleColors[inv.role]}`}
                     >
                       <option value="STAFF">Staff</option>
-                      <option value="MANAGER">Manager</option>
                       <option value="OWNER">Owner</option>
                     </select>
 
@@ -248,7 +240,7 @@ function OrganizationSetup() {
                       <button
                         type="button"
                         onClick={() => removeInvitation(index)}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       >
                         <span className="material-icons text-sm">close</span>
                       </button>
@@ -260,7 +252,7 @@ function OrganizationSetup() {
                 <button
                   type="button"
                   onClick={addInvitation}
-                  className="w-full py-2.5 border border-dashed border-slate-300 rounded-xl text-sm font-medium text-slate-500 hover:border-brand-400 hover:text-brand-700 hover:bg-brand-50 transition-all flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 border border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 hover:border-blue-400 hover:text-blue-700 hover:bg-blue-50 transition-all flex items-center justify-center gap-1.5"
                 >
                   <span className="material-icons text-sm">add</span>
                   Add another
@@ -270,14 +262,14 @@ function OrganizationSetup() {
                   <button
                     type="button"
                     onClick={() => navigate('/dashboard')}
-                    className="flex-1 py-2.5 border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-colors text-sm"
+                    className="flex-1 py-2.5 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm"
                   >
                     Skip for now
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 flex items-center justify-center gap-2 bg-brand-700 hover:bg-brand-800 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm disabled:opacity-60 shadow-sm"
+                    className="flex-1 flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm disabled:opacity-60 shadow-sm"
                   >
                     {loading ? (
                       <>
@@ -299,7 +291,7 @@ function OrganizationSetup() {
       </div>
 
       {/* Bottom */}
-      <p className="relative z-10 mt-6 text-xs text-slate-400 text-center">
+      <p className="relative z-10 mt-6 text-xs text-gray-400 text-center">
         You can always manage your team from Settings later.
       </p>
     </div>
