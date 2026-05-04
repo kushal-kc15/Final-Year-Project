@@ -7,8 +7,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ['Bricolage Grotesque', 'sans-serif'],
-        body: ['DM Sans', 'sans-serif'],
+        display: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+        body: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out',
