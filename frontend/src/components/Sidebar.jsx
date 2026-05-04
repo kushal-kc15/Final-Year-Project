@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Logo from './Logo';
 
 const mainNav = [
   { key: 'dashboard', to: '/dashboard', icon: 'grid_view',       label: 'Dashboard'  },
   { key: 'expenses',  to: '/expenses',  icon: 'receipt_long',    label: 'Expenses'   },
-  { key: 'approvals', to: '/approvals', icon: 'task_alt',        label: 'Approvals', managerOnly: true },
-  { key: 'reports',   to: '/reports',   icon: 'bar_chart',       label: 'Reports',   managerOnly: true },
-  { key: 'budgets',   to: '/budgets',   icon: 'account_balance', label: 'Budgets',   managerOnly: true },
-  { key: 'vendors',   to: '/vendors',   icon: 'storefront',      label: 'Vendors',   managerOnly: true },
+  { key: 'approvals', to: '/approvals', icon: 'task_alt',        label: 'Approvals', ownerOnly: true },
+  { key: 'reports',   to: '/reports',   icon: 'bar_chart',       label: 'Reports',   ownerOnly: true },
+  { key: 'budgets',   to: '/budgets',   icon: 'account_balance', label: 'Budgets',   ownerOnly: true },
+  { key: 'vendors',   to: '/vendors',   icon: 'storefront',      label: 'Vendors',   ownerOnly: true },
   { key: 'activity',  to: '/activity',  icon: 'notifications',   label: 'Activity'   },
 ];
 
@@ -18,11 +19,10 @@ const settingsNav = [
 
 export default function Sidebar({ currentPage }) {
   const { user, role, logout } = useAuth();
-  const isManager = role === 'OWNER' || role === 'MANAGER';
+  const isOwner = role === 'OWNER';
 
   const roleConfig = {
     OWNER:   { label: 'Owner',   color: 'text-blue-300',    dot: 'bg-blue-400'    },
-    MANAGER: { label: 'Manager', color: 'text-emerald-300', dot: 'bg-emerald-400' },
     STAFF:   { label: 'Staff',   color: 'text-slate-400',   dot: 'bg-slate-500'   },
   };
   const rc = roleConfig[role] || roleConfig.STAFF;
@@ -54,9 +54,7 @@ export default function Sidebar({ currentPage }) {
     >
       {/* Logo */}
       <div className="px-5 h-16 flex items-center gap-3 border-b border-white/5 shrink-0">
-        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shrink-0">
-          <span className="material-icons text-white text-sm">account_balance_wallet</span>
-        </div>
+        <Logo className="w-10 h-10 shrink-0" />
         <div>
           <p className="font-display text-[14px] font-700 text-white leading-tight">Vyapar</p>
           <p className="text-[10px] text-slate-500 leading-tight">Margadarshan</p>
@@ -69,7 +67,7 @@ export default function Sidebar({ currentPage }) {
           <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest px-3 mb-2">Menu</p>
           <div className="space-y-0.5">
             {mainNav
-              .filter(item => !item.managerOnly || isManager)
+              .filter(item => !item.ownerOnly || isOwner)
               .map(item => <NavItem key={item.key} item={item} />)
             }
           </div>
