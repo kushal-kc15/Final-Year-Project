@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,14 +11,16 @@
 
   body {
     margin: 0;
-    font-family: 'DM Sans', system-ui, sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     @apply bg-white text-slate-900;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Bricolage Grotesque', sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
 
   ::-webkit-scrollbar {
