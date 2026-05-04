@@ -51,10 +51,10 @@ function AcceptInvitation() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-700 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-slate-500">Loading invitation...</p>
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-gray-900 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-gray-500">Loading invitation...</p>
         </div>
       </div>
     );
@@ -62,16 +62,16 @@ function AcceptInvitation() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-8 text-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
+        <div className="max-w-md w-full bg-white rounded-xl border border-gray-200 shadow-lg p-8 text-center">
           <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="material-icons text-red-500 text-3xl">error_outline</span>
           </div>
-          <h2 className="font-display text-xl font-700 text-slate-900 mb-2">Invalid Invitation</h2>
-          <p className="text-sm text-slate-500 mb-6">{error}</p>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Invalid Invitation</h2>
+          <p className="text-sm text-gray-500 mb-6">{error}</p>
           <Link
             to="/dashboard"
-            className="inline-block px-6 py-2.5 bg-brand-700 text-white font-semibold rounded-xl hover:bg-brand-800 transition-colors text-sm"
+            className="inline-block px-6 py-2.5 bg-gray-900 text-white font-semibold rounded-xl hover:bg-gray-800 transition-colors text-sm"
           >
             Go to Dashboard
           </Link>
@@ -81,23 +81,23 @@ function AcceptInvitation() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-8">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
+      <div className="max-w-md w-full bg-white rounded-xl border border-gray-200 shadow-lg p-8">
         <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="material-icons text-brand-700 text-3xl">mail</span>
+          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="material-icons text-blue-700 text-3xl">mail</span>
           </div>
-          <h2 className="font-display text-2xl font-700 text-slate-900 mb-2">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
             You've been invited!
           </h2>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-gray-500">
             Accept this invitation to join the organization and start collaborating.
           </p>
         </div>
 
-        <div className="bg-slate-50 rounded-xl p-4 mb-6">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Invitation Details</p>
-          <p className="text-sm text-slate-600">
+        <div className="bg-gray-50 rounded-xl p-4 mb-6">
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Invitation Details</p>
+          <p className="text-sm text-gray-600">
             You'll be added as a team member and can start managing expenses.
           </p>
         </div>
@@ -113,14 +113,14 @@ function AcceptInvitation() {
           <button
             onClick={handleDecline}
             disabled={accepting}
-            className="flex-1 py-2.5 border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-colors text-sm disabled:opacity-50"
+            className="flex-1 py-2.5 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm disabled:opacity-50"
           >
             Decline
           </button>
           <button
             onClick={handleAccept}
             disabled={accepting}
-            className="flex-1 py-2.5 bg-brand-700 text-white font-semibold rounded-xl hover:bg-brand-800 transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 bg-gray-900 text-white font-semibold rounded-xl hover:bg-gray-800 transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {accepting ? (
               <>
