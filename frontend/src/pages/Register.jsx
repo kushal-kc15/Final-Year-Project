@@ -264,7 +264,7 @@ function Register() {
                   placeholder="Email address"
                   className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400"
                 />
-                <p className="text-xs text-gray-500 mt-1.5">You'll use this email to sign in</p>
+                <p className="text-xs text-gray-500 mt-1.5">You'll use this email to sign in </p>
               </div>
 
               <button
