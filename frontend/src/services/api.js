@@ -12,10 +12,28 @@ const api = axios.create({
 // Add token to requests
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Don't add auth header for public endpoints
+    const publicEndpoints = [
+      '/auth/register/',
+      '/auth/login/',
+      '/auth/check-password-strength/',
+      '/auth/verify-email/',
+      '/auth/resend-verification/',
+      '/auth/request-password-reset/',
+      '/auth/reset-password/',
+    ];
+    
+    const isPublicEndpoint = publicEndpoints.some(endpoint => 
+      config.url.includes(endpoint)
+    );
+    
+    if (!isPublicEndpoint) {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
+    
     return config;
   },
   (error) => Promise.reject(error)

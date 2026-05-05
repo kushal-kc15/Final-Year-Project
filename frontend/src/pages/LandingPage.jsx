@@ -81,11 +81,11 @@ export default function LandingPage() {
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
               <Link to="/register" className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-8 py-4 rounded-xl text-base font-semibold shadow-xl shadow-blue-500/30 hover:shadow-2xl hover:shadow-blue-500/40 transition-all flex items-center gap-2">
-                Request a Demo
+                Sign Up
               </Link>
               <button className="border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-8 py-4 rounded-xl text-base font-semibold transition-all flex items-center gap-2">
                 <span className="material-icons text-red-500">play_circle</span>
-                Watch Demo
+                Sign In
               </button>
             </div>
 

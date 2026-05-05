@@ -50,6 +50,35 @@ class RegisterView(generics.CreateAPIView):
         
         user = serializer.save()
         
+        # Check if user is registering via invitation
+        invite_token = request.data.get('invite_token')
+        
+        # Only create organization if NOT registering via invitation
+        if not invite_token:
+            # Create organization for the new user and make them owner
+            from organizations.models import Organization, OrganizationMember
+            
+            org_name = user.business_name if user.business_name else f"{user.username}'s Organization"
+            organization = Organization.objects.create(
+                name=org_name,
+                description=f"Organization created for {user.username}"
+            )
+            
+            # Add user as OWNER of their organization
+            OrganizationMember.objects.create(
+                organization=organization,
+                user=user,
+                role='OWNER'
+            )
+            
+            org_data = {
+                'id': organization.id,
+                'name': organization.name,
+                'role': 'OWNER'
+            }
+        else:
+            org_data = None
+        
         # Generate verification token
         token = generate_token()
         user.email_verification_token = token
@@ -58,10 +87,15 @@ class RegisterView(generics.CreateAPIView):
         # Send verification email
         send_verification_email(user, token)
         
-        return Response({
+        response_data = {
             'user': UserSerializer(user, context={'request': request}).data,
             'message': 'User registered successfully. Please check your email to verify your account.'
-        }, status=status.HTTP_201_CREATED)
+        }
+        
+        if org_data:
+            response_data['organization'] = org_data
+        
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):

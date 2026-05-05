@@ -22,16 +22,20 @@ class OCRProcessor:
         genai.configure(api_key=self.gemini_api_key)
         
         # Try different model names in order of preference
+        # Updated for current Gemini API (2025+)
         self.model_names = [
-            'gemini-1.5-flash',
-            'gemini-1.5-pro',
-            'gemini-pro-vision',
+            'gemini-2.5-flash',      # Latest stable flash model
+            'gemini-flash-latest',   # Always points to latest flash
+            'gemini-2.0-flash',      # Fallback to 2.0
+            'gemini-pro-latest',     # Latest pro model
         ]
         
         self.model = None
+        self.model_name = None
         for model_name in self.model_names:
             try:
                 self.model = genai.GenerativeModel(model_name)
+                self.model_name = model_name
                 print(f"✓ Using Gemini model: {model_name}")
                 break
             except Exception as e:
@@ -39,6 +43,15 @@ class OCRProcessor:
                 continue
         
         if not self.model:
+            # List available models for debugging
+            try:
+                available_models = genai.list_models()
+                print("Available models:")
+                for m in available_models:
+                    if 'generateContent' in m.supported_generation_methods:
+                        print(f"  - {m.name}")
+            except:
+                pass
             raise Exception("No Gemini models available. Please check your API key and quota.")
         
         # Retry configuration
@@ -50,6 +63,7 @@ class OCRProcessor:
         Extract receipt data using Google Gemini API with retry logic
         Returns structured data directly
         """
+        print(f"🔍 Processing receipt with {self.model_name}...")
         last_error = None
         
         for attempt in range(self.max_retries):
@@ -58,9 +72,23 @@ class OCRProcessor:
                 img = Image.open(self.image_path)
                 
                 # Create prompt for structured extraction
-                prompt = """Analyze this receipt image and extract the following information in JSON format:
+                prompt = """FIRST, determine if this image is actually a receipt, invoice, or bill. If it's NOT a receipt/invoice/bill (e.g., random photo, document, screenshot), return this exact JSON:
 
 {
+    "is_receipt": false,
+    "vendor_name": "",
+    "total_amount": 0,
+    "receipt_date": "",
+    "category": "OTHER",
+    "description": "",
+    "line_items": [],
+    "raw_text": ""
+}
+
+If it IS a receipt/invoice/bill, analyze it and extract the following information in JSON format:
+
+{
+    "is_receipt": true,
     "vendor_name": "name of the store/vendor",
     "total_amount": "total amount as a number (e.g., 1234.56)",
     "receipt_date": "date in YYYY-MM-DD format",
@@ -78,6 +106,8 @@ class OCRProcessor:
 }
 
 Rules:
+- A receipt/invoice/bill typically has: vendor name, items/services, prices, total amount, date
+- If the image doesn't have these characteristics, set is_receipt to false
 - Extract the TOTAL amount (not subtotal)
 - If date is unclear, use today's date
 - For category, analyze the receipt content and vendor to determine the most appropriate category:
@@ -92,8 +122,7 @@ Rules:
 - For line_items, extract as many as you can identify with accurate quantities and prices
 - Include all visible text in raw_text
 - For description, provide a brief summary of what was purchased
-- Return valid JSON only, no markdown formatting
-- If you cannot read something, use empty string or 0"""
+- Return valid JSON only, no markdown formatting"""
 
                 # Call Gemini API with old package (more stable)
                 response = self.model.generate_content([prompt, img])
@@ -111,6 +140,10 @@ Rules:
                 
                 data = json.loads(result_text)
                 
+                # Check if it's actually a receipt
+                if not data.get('is_receipt', True):
+                    raise Exception("No receipt data found. The uploaded image does not appear to be a receipt, invoice, or bill.")
+                
                 # Convert to expected format
                 return {
                     'raw_text': data.get('raw_text', ''),
@@ -118,7 +151,7 @@ Rules:
                     'vendor_confidence': 95,
                     'total_amount': Decimal(str(data.get('total_amount', 0))) if data.get('total_amount') else None,
                     'amount_confidence': 95,
-                    'receipt_date': datetime.strptime(data.get('receipt_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d').date(),
+                    'receipt_date': datetime.strptime(data.get('receipt_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d').date() if data.get('receipt_date') else datetime.now().date(),
                     'date_confidence': 90,
                     'category': data.get('category', 'OTHER'),
                     'description': data.get('description', ''),

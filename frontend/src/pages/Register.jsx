@@ -94,7 +94,13 @@ function Register() {
     
     setLoading(true);
     try {
-      const response = await authService.register(formData);
+      // Include invite token if present
+      const registrationData = { ...formData };
+      if (inviteToken) {
+        registrationData.invite_token = inviteToken;
+      }
+      
+      const response = await authService.register(registrationData);
       setRegistrationSuccess(true);
     } catch (err) {
       const errorData = err.response?.data;
@@ -145,6 +151,14 @@ function Register() {
             We've sent a verification link to <strong>{formData.email}</strong>. 
             Please check your inbox and click the link to verify your account.
           </p>
+          {inviteToken && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 text-left">
+              <p className="text-xs text-blue-900 font-semibold mb-1">🎉 Organization Invitation</p>
+              <p className="text-xs text-blue-800">
+                After verifying your email and logging in, you'll be able to accept the organization invitation.
+              </p>
+            </div>
+          )}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-left">
             <p className="text-xs text-blue-900 font-semibold mb-2">📧 Didn't receive the email?</p>
             <ul className="text-xs text-blue-800 space-y-1 ml-4 list-disc">
@@ -154,7 +168,7 @@ function Register() {
             </ul>
           </div>
           <Link
-            to="/login"
+            to={inviteToken ? `/login?invite=${inviteToken}` : "/login"}
             className="inline-flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg transition-colors text-sm"
           >
             Go to Login

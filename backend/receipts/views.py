@@ -79,11 +79,24 @@ class ReceiptViewSet(viewsets.ModelViewSet):
             receipt.save()
             
         except Exception as e:
+            error_msg = str(e)
             receipt.status = 'FAILED'
-            receipt.error_message = str(e)
+            receipt.error_message = error_msg
             receipt.save()
+            
+            # Check if it's a "not a receipt" error
+            if 'No receipt data found' in error_msg or 'does not appear to be a receipt' in error_msg:
+                return Response(
+                    {
+                        'error': 'No receipt data found',
+                        'message': 'The uploaded image does not appear to be a receipt, invoice, or bill. Please upload a clear image of a receipt.',
+                        'receipt_id': receipt.id
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             return Response(
-                {'error': f'OCR processing failed: {str(e)}'},
+                {'error': f'OCR processing failed: {error_msg}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         

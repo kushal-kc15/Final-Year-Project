@@ -6,7 +6,6 @@ import AddExpenseModal from '../components/AddExpenseModal';
 import Sidebar from '../components/Sidebar';
 import NotificationBell from '../components/NotificationBell';
 import ProfileDropdown from '../components/ProfileDropdown';
-import OnboardingChecklist from '../components/OnboardingChecklist';
 import { formatCurrency } from '../utils/currency';
 
 const STATUS_STYLE = { APPROVED: 'bg-emerald-50 text-emerald-700', PENDING: 'bg-amber-50 text-amber-700', REJECTED: 'bg-red-50 text-red-600' };
@@ -22,7 +21,6 @@ function Dashboard() {
   const [budgetAlerts, setBudgetAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showChecklist, setShowChecklist] = useState(true);
 
   const fmt = (amount) => formatCurrency(amount, currency);
 
@@ -440,7 +438,6 @@ function Dashboard() {
         </div>
       </div>
       <AddExpenseModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={onSuccess} />
-      {showChecklist && <OnboardingChecklist onClose={() => setShowChecklist(false)} />}
     </div>
   );
 }
