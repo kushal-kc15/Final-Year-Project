@@ -89,7 +89,7 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
       
       {/* Main Card Container */}
       <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden flex">
@@ -188,25 +188,26 @@ function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              aria-label="Sign in to your account"
             >
-              {loading ? 'Signing in...' : 'Next'}
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
 
           <div className="mt-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="text-sm font-semibold text-gray-700">Sign in using</div>
+              <div className="text-sm font-semibold text-gray-700">Or continue with</div>
               <Link to="/forgot-password" className="text-sm text-blue-600 font-semibold hover:text-blue-700">
                 Forgot password?
               </Link>
             </div>
             
             <div className="flex items-center gap-2 flex-wrap">
-              <button type="button" className="w-10 h-10 bg-gray-900 hover:bg-gray-800 rounded-lg flex items-center justify-center transition-colors">
+              <button type="button" aria-label="Sign in with Apple" className="w-10 h-10 bg-gray-900 hover:bg-gray-800 rounded-lg flex items-center justify-center transition-colors">
                 <span className="material-icons text-white text-lg">apple</span>
               </button>
-              <button type="button" className="w-10 h-10 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg flex items-center justify-center transition-colors">
+              <button type="button" aria-label="Sign in with Google" className="w-10 h-10 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg flex items-center justify-center transition-colors">
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                   <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -216,7 +217,7 @@ function Login() {
               </button>
               
              
-              <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-lg text-gray-400">
+              <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-lg text-gray-400" aria-hidden>
                 <span className="material-icons text-lg">more_horiz</span>
               </div>
             </div>

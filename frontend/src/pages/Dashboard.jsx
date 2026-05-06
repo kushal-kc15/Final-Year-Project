@@ -76,22 +76,22 @@ function Dashboard() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 font-body" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
+    <div className="flex min-h-screen bg-gray-50">
       <Sidebar currentPage="dashboard" onAddNew={() => setIsModalOpen(true)} />
       <div className="ml-64 flex-1 flex flex-col">
 
         {/* Header */}
         <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-8 h-20 flex items-center justify-between shrink-0">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Welcome back, {user?.username}</p>
+            <h1 className="text-2xl font-extrabold text-slate-900">Dashboard</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Welcome back, <span className="font-medium text-slate-700">{user?.username}</span></p>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-all shadow-lg shadow-blue-500/30">
+            <button onClick={() => setIsModalOpen(true)} className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-shadow shadow-sm">
               <span className="material-icons text-lg">add</span>
-              New Expense
+              New expense
             </button>
-            <div className="w-px h-8 bg-gray-200" />
+            <div className="w-px h-8 bg-gray-100" aria-hidden />
             <NotificationBell />
             <ProfileDropdown />
           </div>
@@ -111,7 +111,7 @@ function Dashboard() {
                   <div className="w-24 h-3 bg-gray-100 rounded" />
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-lg transition-shadow">
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Today</p>
@@ -121,8 +121,8 @@ function Dashboard() {
                       <span className="material-icons text-blue-600">today</span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500">{metrics?.today?.count || 0} transactions</span>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>{metrics?.today?.count || 0} transactions</span>
                     {!!metrics?.today?.growth && (
                       <span className={`font-semibold ${metrics.today.growth > 0 ? 'text-red-600' : 'text-green-600'}`}>
                         {metrics.today.growth > 0 ? '+' : ''}{metrics.today.growth}%
@@ -140,7 +140,7 @@ function Dashboard() {
                   <div className="w-24 h-3 bg-gray-100 rounded" />
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-lg transition-shadow">
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">This Week</p>
@@ -169,7 +169,7 @@ function Dashboard() {
                   <div className="w-24 h-3 bg-gray-100 rounded" />
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-lg transition-shadow">
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">This Month</p>
@@ -193,7 +193,7 @@ function Dashboard() {
 
             {/* Budget Alerts Widget (OWNER only) */}
             {!loading && userRole === 'OWNER' && budgetAlerts.length > 0 && (
-              <div className="col-span-12 md:col-span-6 bg-white rounded-xl border-2 border-red-200 p-6 shadow-lg shadow-red-100">
+              <div className="col-span-12 md:col-span-6 bg-white rounded-xl border border-red-100 p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
@@ -206,36 +206,24 @@ function Dashboard() {
                     <span className="material-icons text-sm">arrow_forward</span>
                   </Link>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {budgetAlerts.map(alert => (
-                    <div 
-                      key={alert.id} 
-                      className={`flex items-start justify-between p-3 rounded-lg border-l-4 ${
-                        alert.alert_type === 'EXCEEDED' 
-                          ? 'bg-red-50 border-red-500' 
-                          : 'bg-amber-50 border-amber-500'
-                      }`}
-                    >
-                      <div className="flex items-start gap-2 flex-1 min-w-0">
-                        <span className={`material-icons text-sm mt-0.5 shrink-0 ${
-                          alert.alert_type === 'EXCEEDED' ? 'text-red-600' : 'text-amber-600'
-                        }`}>
-                          {alert.alert_type === 'EXCEEDED' ? 'error' : 'warning'}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-gray-900 truncate">{alert.budget_name}</p>
-                          <p className="text-xs text-gray-600 mt-0.5">
-                            {alert.percentage}% used · {fmt(alert.amount_spent)}
-                          </p>
+                    <div key={alert.id} className={`flex items-center justify-between p-3 rounded-lg ${alert.alert_type === 'EXCEEDED' ? 'bg-red-50' : 'bg-amber-50'}`}>
+                      <div className="flex items-start gap-3">
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${alert.alert_type === 'EXCEEDED' ? 'bg-red-100' : 'bg-amber-100'}`}>
+                          <span className={`material-icons text-sm ${alert.alert_type === 'EXCEEDED' ? 'text-red-600' : 'text-amber-600'}`}>{alert.alert_type === 'EXCEEDED' ? 'error' : 'warning'}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900 truncate">{alert.budget_name}</p>
+                          <p className="text-xs text-slate-500 mt-1">{alert.percentage}% used · {fmt(alert.amount_spent)}</p>
                         </div>
                       </div>
-                      <button 
-                        onClick={() => handleDismissAlert(alert.id)}
-                        className="text-gray-400 hover:text-gray-600 shrink-0 ml-2"
-                        title="Dismiss"
-                      >
-                        <span className="material-icons text-sm">close</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => handleDismissAlert(alert.id)} className="text-slate-400 hover:text-slate-600" title="Dismiss">
+                          <span className="material-icons text-sm">close</span>
+                        </button>
+                        <Link to="/budgets" className="text-xs text-blue-600 font-semibold">Manage</Link>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -244,37 +232,37 @@ function Dashboard() {
 
             {/* Staff Status Widget */}
             {!loading && userRole === 'STAFF' && myExpenses && (
-              <div className="col-span-12 md:col-span-4 bg-white rounded-xl border border-gray-200 p-6">
-                <h3 className="text-sm font-bold text-gray-900 mb-4">My Expense Status</h3>
+              <div className="col-span-12 md:col-span-4 bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4">My Expense Status</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <span className="material-icons text-amber-600">schedule</span>
-                      <span className="text-sm font-medium text-gray-700">Pending</span>
+                      <span className="text-sm font-medium text-slate-700">Pending</span>
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-amber-600">{myExpenses.pending.count}</p>
-                      <p className="text-xs text-gray-500">{fmt(myExpenses.pending.total)}</p>
+                      <p className="text-xs text-slate-500">{fmt(myExpenses.pending.total)}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <span className="material-icons text-green-600">check_circle</span>
-                      <span className="text-sm font-medium text-gray-700">Approved</span>
+                      <span className="text-sm font-medium text-slate-700">Approved</span>
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-green-600">{myExpenses.approved.count}</p>
-                      <p className="text-xs text-gray-500">{fmt(myExpenses.approved.total)}</p>
+                      <p className="text-xs text-slate-500">{fmt(myExpenses.approved.total)}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <span className="material-icons text-red-600">cancel</span>
-                      <span className="text-sm font-medium text-gray-700">Rejected</span>
+                      <span className="text-sm font-medium text-slate-700">Rejected</span>
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-red-600">{myExpenses.rejected.count}</p>
-                      <p className="text-xs text-gray-500">Resubmit</p>
+                      <p className="text-xs text-slate-500">Resubmit</p>
                     </div>
                   </div>
                 </div>
@@ -286,7 +274,7 @@ function Dashboard() {
               (!loading && userRole === 'STAFF' && myExpenses) || (!loading && userRole === 'OWNER' && budgetAlerts.length > 0) 
                 ? 'md:col-span-6' 
                 : ''
-            } bg-white rounded-xl border border-gray-200 p-6`}>
+            } bg-white rounded-xl border border-gray-200 p-6 shadow-sm`}>
               <h3 className="text-sm font-bold text-gray-900 mb-4">Quick Access</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <button 
@@ -329,7 +317,7 @@ function Dashboard() {
             </div>
 
             {/* Recent Expenses Table */}
-            <div className="col-span-12 bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="col-span-12 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
               <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-gray-900">Recent Expenses</h3>
