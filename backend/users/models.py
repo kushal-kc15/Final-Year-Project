@@ -9,12 +9,6 @@ class User(AbstractUser):
     Custom User model extending Django's AbstractUser.
     Adds business-specific fields for  financial management.
     """
-    USER_CHOICES={
-        ("owner", "Owner"),
-        ('manager', 'Manager'),
-        ("staff", "Staff"),
-    }
-    
     CURRENCY_CHOICES = [
         ('NPR', 'रू (NPR)'),
         ('USD', '$ (USD)'),
@@ -65,7 +59,12 @@ class User(AbstractUser):
         max_length=100,
         blank=True,
         null=True,
-        help_text="Token for email verification"
+        help_text="Hashed token for email verification"
+    )
+    email_verification_token_created_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the current email verification token was issued"
     )
     two_factor_enabled = models.BooleanField(
         default=False,
@@ -91,6 +90,14 @@ class User(AbstractUser):
         blank=True,
         help_text="IP address of last login"
     )
+    active_organization = models.ForeignKey(
+        'organizations.Organization',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='active_users',
+        help_text="Currently selected workspace organization"
+    )
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -110,7 +117,7 @@ class PasswordResetToken(models.Model):
     Model for password reset tokens
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_reset_tokens')
-    token = models.CharField(max_length=100, unique=True)
+    token = models.CharField(max_length=100, unique=True, help_text="Hashed password reset token")
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     used = models.BooleanField(default=False)
@@ -137,7 +144,7 @@ class TwoFactorOTP(models.Model):
     Model for storing 2FA OTP codes
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='two_factor_otps')
-    otp_code = models.CharField(max_length=6)
+    otp_code = models.CharField(max_length=64, help_text="Hashed OTP code")
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     used = models.BooleanField(default=False)

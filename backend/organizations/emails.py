@@ -1,10 +1,14 @@
 """
 Email utilities for organization invitations
 """
+import logging
+
 from django.core.mail import send_mail
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
+
+logger = logging.getLogger(__name__)
 
 
 def send_invitation_email(invitation, request=None):
@@ -110,5 +114,8 @@ Expense Management Made Simple
         )
         return True
     except Exception as e:
-        print(f"Failed to send invitation email: {e}")
+        logger.exception(
+            'Failed to send invitation email',
+            extra={'invitation_id': invitation.id, 'organization_id': invitation.organization_id},
+        )
         return False

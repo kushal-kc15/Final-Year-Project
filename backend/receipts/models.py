@@ -43,6 +43,11 @@ class Receipt(models.Model):
     
     # Raw OCR text
     raw_text = models.TextField(blank=True)
+
+    # OCR provider metadata and validation quality signals
+    ocr_provider = models.CharField(max_length=50, blank=True, default='')
+    ocr_model = models.CharField(max_length=100, blank=True, default='')
+    ocr_validation_warnings = models.JSONField(default=list, blank=True)
     
     # Confidence scores (0-100)
     vendor_confidence = models.IntegerField(default=0)

@@ -13,8 +13,9 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email', 'business_name', 'phone_number', 
                   'first_name', 'last_name', 'default_currency', 'items_per_page',
-                  'theme_preference', 'profile_picture', 'profile_picture_url', 'created_at']
-        read_only_fields = ['id', 'created_at', 'profile_picture_url']
+                  'theme_preference', 'two_factor_enabled', 'profile_picture',
+                  'profile_picture_url', 'created_at']
+        read_only_fields = ['id', 'created_at', 'profile_picture_url', 'two_factor_enabled']
     
     def get_profile_picture_url(self, obj):
         """Get full URL for profile picture"""

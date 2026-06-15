@@ -1,7 +1,11 @@
 """
-Utility functions for creating notifications
+Utility functions for creating notifications.
 """
+import logging
+
 from .models import Notification
+
+logger = logging.getLogger(__name__)
 
 
 def create_notification(
@@ -13,24 +17,10 @@ def create_notification(
     priority='MEDIUM',
     related_object_type=None,
     related_object_id=None,
-    action_url=None
+    action_url=None,
 ):
     """
-    Create a notification for a user.
-    
-    Args:
-        user: User object to receive the notification
-        notification_type: Type of notification (from TYPE_CHOICES)
-        title: Short title for the notification
-        message: Detailed message
-        organization: Organization object (optional)
-        priority: Priority level (LOW, MEDIUM, HIGH, URGENT)
-        related_object_type: Type of related object (e.g., 'expense', 'budget')
-        related_object_id: ID of related object
-        action_url: Frontend URL for action button
-    
-    Returns:
-        Notification object
+    Create an in-app notification for a user.
     """
     return Notification.objects.create(
         user=user,
@@ -41,42 +31,45 @@ def create_notification(
         priority=priority,
         related_object_type=related_object_type,
         related_object_id=related_object_id,
-        action_url=action_url
+        action_url=action_url,
     )
 
 
 def notify_expense_approved(expense, approved_by):
-    """Notify user when their expense is approved"""
-    # Create in-app notification
+    """Notify a submitter when their expense is approved."""
     notification = create_notification(
         user=expense.user,
         notification_type='EXPENSE_APPROVED',
-        title='Expense Approved ✓',
-        message=f'Your expense "{expense.title}" (रू {expense.amount}) has been approved by {approved_by.get_full_name() or approved_by.username}.',
+        title='Expense Approved',
+        message=(
+            f'Your expense "{expense.title}" (NPR {expense.amount}) has been '
+            f'approved by {approved_by.get_full_name() or approved_by.username}.'
+        ),
         organization=expense.organization,
         priority='MEDIUM',
         related_object_type='expense',
         related_object_id=expense.id,
-        action_url='/expenses'
+        action_url='/expenses',
     )
-    
-    # Send email notification
+
     from expenses.emails import send_expense_approval_email
     try:
         send_expense_approval_email(expense, approved_by)
-    except Exception as e:
-        print(f"Failed to send approval email: {e}")
-    
+    except Exception:
+        logger.exception('Failed to send approval email', extra={'expense_id': expense.id})
+
     return notification
 
 
 def notify_expense_rejected(expense, rejected_by, reason=''):
-    """Notify user when their expense is rejected"""
-    message = f'Your expense "{expense.title}" (रू {expense.amount}) has been rejected by {rejected_by.get_full_name() or rejected_by.username}.'
+    """Notify a submitter when their expense is rejected."""
+    message = (
+        f'Your expense "{expense.title}" (NPR {expense.amount}) has been '
+        f'rejected by {rejected_by.get_full_name() or rejected_by.username}.'
+    )
     if reason:
         message += f' Reason: {reason}'
-    
-    # Create in-app notification
+
     notification = create_notification(
         user=expense.user,
         notification_type='EXPENSE_REJECTED',
@@ -86,81 +79,92 @@ def notify_expense_rejected(expense, rejected_by, reason=''):
         priority='HIGH',
         related_object_type='expense',
         related_object_id=expense.id,
-        action_url='/expenses'
+        action_url='/expenses',
     )
-    
-    # Send email notification
+
     from expenses.emails import send_expense_rejection_email
     try:
         send_expense_rejection_email(expense, rejected_by, reason)
-    except Exception as e:
-        print(f"Failed to send rejection email: {e}")
-    
+    except Exception:
+        logger.exception('Failed to send rejection email', extra={'expense_id': expense.id})
+
     return notification
 
 
 def notify_pending_approval(managers, expense):
-    """Notify managers about pending expense approval"""
+    """Notify organization managers about a pending expense approval."""
     notifications = []
+    submitter = expense.user.get_full_name() or expense.user.username
+
     for manager in managers:
         notif = create_notification(
             user=manager.user,
             notification_type='EXPENSE_PENDING',
             title='New Expense Pending',
-            message=f'{expense.user.get_full_name() or expense.user.username} submitted "{expense.title}" (रू {expense.amount}) for approval.',
+            message=f'{submitter} submitted "{expense.title}" (NPR {expense.amount}) for approval.',
             organization=expense.organization,
             priority='MEDIUM',
             related_object_type='expense',
             related_object_id=expense.id,
-            action_url='/approvals'
+            action_url='/approvals',
         )
         notifications.append(notif)
+
     return notifications
 
 
 def notify_budget_alert(user, budget, current_spending, percentage):
-    """Notify user about budget threshold reached"""
+    """Notify a user when a budget threshold is reached."""
     return create_notification(
         user=user,
         notification_type='BUDGET_ALERT',
-        title='Budget Alert ⚠️',
-        message=f'Your {budget.category} budget has reached {percentage:.1f}% (रू {current_spending} of रू {budget.amount}).',
+        title='Budget Alert',
+        message=(
+            f'Your {budget.category} budget has reached {percentage:.1f}% '
+            f'(NPR {current_spending} of NPR {budget.amount}).'
+        ),
         organization=budget.organization,
         priority='HIGH',
         related_object_type='budget',
         related_object_id=budget.id,
-        action_url='/budgets'
+        action_url='/budgets',
     )
 
 
 def notify_budget_exceeded(user, budget, current_spending, percentage):
-    """Notify user about budget exceeded"""
+    """Notify a user when a budget is exceeded."""
     over_amount = float(current_spending) - float(budget.amount)
     return create_notification(
         user=user,
         notification_type='BUDGET_EXCEEDED',
-        title='Budget Exceeded! 🚨',
-        message=f'Your {budget.category} budget has been exceeded by रू {over_amount:.2f} ({percentage:.1f}% used).',
+        title='Budget Exceeded',
+        message=(
+            f'Your {budget.category} budget has been exceeded by '
+            f'NPR {over_amount:.2f} ({percentage:.1f}% used).'
+        ),
         organization=budget.organization,
         priority='URGENT',
         related_object_type='budget',
         related_object_id=budget.id,
-        action_url='/budgets'
+        action_url='/budgets',
     )
 
 
 def notify_member_joined(managers, new_member):
-    """Notify managers when a new member joins"""
+    """Notify managers when a new member joins an organization."""
     notifications = []
+    member_name = new_member.user.get_full_name() or new_member.user.username
+
     for manager in managers:
         notif = create_notification(
             user=manager.user,
             notification_type='MEMBER_JOINED',
             title='New Team Member',
-            message=f'{new_member.user.get_full_name() or new_member.user.username} has joined your organization as {new_member.role}.',
+            message=f'{member_name} has joined your organization as {new_member.role}.',
             organization=new_member.organization,
             priority='LOW',
-            action_url='/team'
+            action_url='/team',
         )
         notifications.append(notif)
+
     return notifications

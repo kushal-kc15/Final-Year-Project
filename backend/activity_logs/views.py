@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.db.models import Q
 from .models import ActivityLog
 from .serializers import ActivityLogSerializer
-from organizations.models import OrganizationMember
+from organizations.context import get_active_membership
 
 
 class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
@@ -14,15 +14,13 @@ class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user = self.request.user
         
-        # Get user's organization
-        try:
-            member = OrganizationMember.objects.get(user=user)
-            organization = member.organization
-        except OrganizationMember.DoesNotExist:
+        member = get_active_membership(user, self.request)
+        if not member:
             return ActivityLog.objects.none()
-        
-        # Filter by organization
-        queryset = ActivityLog.objects.filter(organization=organization)
+
+        queryset = ActivityLog.objects.filter(
+            organization=member.organization
+        ).select_related('user', 'organization')
         
         # Filter by action type if provided
         action_type = self.request.query_params.get('action_type', None)

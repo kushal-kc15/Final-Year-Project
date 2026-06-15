@@ -32,6 +32,8 @@ class ActivityLog(models.Model):
         indexes = [
             models.Index(fields=['-timestamp']),
             models.Index(fields=['organization', '-timestamp']),
+            models.Index(fields=['organization', 'action_type', '-timestamp'], name='act_org_action_ts_idx'),
+            models.Index(fields=['organization', 'user', '-timestamp'], name='act_org_user_ts_idx'),
             models.Index(fields=['action_type']),
         ]
 

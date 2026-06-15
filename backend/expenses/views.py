@@ -10,6 +10,8 @@ from .models import Expense
 from .serializers import ExpenseSerializer
 from activity_logs.utils import log_activity
 from notifications.utils import notify_expense_approved, notify_expense_rejected, notify_pending_approval
+from organizations.context import get_active_membership
+from organizations.models import OrganizationMember
 
 
 class ExpenseViewSet(viewsets.ModelViewSet):
@@ -28,25 +30,18 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         - STAFF: Only their own expenses
         """
         user = self.request.user
-        
-        # Get user's role
-        from organizations.models import OrganizationMember
-        member = OrganizationMember.objects.filter(user=user).first()
-        
-        if member and member.role in ['OWNER', 'MANAGER']:
-            # OWNER can see all organization expenses
-            return Expense.objects.filter(organization=member.organization)
-        else:
-            # STAFF can only see their own expenses
-            return Expense.objects.filter(user=user)
+        member = get_active_membership(user, self.request)
+        queryset = Expense.objects.select_related('user', 'organization')
+
+        if member and member.role == 'OWNER':
+            return queryset.filter(organization=member.organization)
+        if member:
+            return queryset.filter(user=user, organization=member.organization)
+        return queryset.filter(user=user)
     
     def perform_create(self, serializer):
-        # Get user's role in their organization
         user = self.request.user
-        
-        # Find user's organization membership
-        from organizations.models import OrganizationMember
-        member = OrganizationMember.objects.filter(user=user).first()
+        member = get_active_membership(user, self.request)
         
         # Set status based on role
         if member and member.role == 'STAFF':
@@ -121,16 +116,13 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         user = request.user
         today = timezone.now().date()
         
-        # Get user's role
-        from organizations.models import OrganizationMember
-        member = OrganizationMember.objects.filter(user=user).first()
-        
-        # Determine which expenses to include
+        member = get_active_membership(user, request)
+
         if member and member.role == 'OWNER':
-            # OWNER sees all organization expenses (only APPROVED)
             base_filter = Q(organization=member.organization, status='APPROVED')
+        elif member:
+            base_filter = Q(user=user, organization=member.organization)
         else:
-            # STAFF see only their own expenses
             base_filter = Q(user=user)
         
         # Today's metrics
@@ -268,10 +260,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         """Get all pending expenses in the organization for approval (OWNER only)"""
         user = request.user
         
-        # Get user's role
-        from organizations.models import OrganizationMember
-        member = OrganizationMember.objects.filter(user=user).first()
-        
+        member = get_active_membership(user, request)
+
         if not member or member.role != 'OWNER':
             return Response(
                 {'error': 'Only owners can view pending approvals'},
@@ -282,7 +272,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         pending_expenses = Expense.objects.filter(
             organization=member.organization,
             status='PENDING'
-        ).exclude(user=user).order_by('-date', '-created_at')
+        ).exclude(user=user).select_related('user', 'organization').order_by('-date', '-created_at')
         
         serializer = self.get_serializer(pending_expenses, many=True)
         return Response(serializer.data)
@@ -292,10 +282,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         """Approve a pending expense (OWNER only)"""
         user = request.user
         
-        # Get user's role
-        from organizations.models import OrganizationMember
-        member = OrganizationMember.objects.filter(user=user).first()
-        
+        member = get_active_membership(user, request)
+
         if not member or member.role != 'OWNER':
             return Response(
                 {'error': 'Only owners can approve expenses'},
@@ -304,7 +292,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         
         # Get expense from organization (not filtered by user)
         try:
-            expense = Expense.objects.get(pk=pk, organization=member.organization)
+            expense = Expense.objects.select_related('user', 'organization').get(pk=pk, organization=member.organization)
         except Expense.DoesNotExist:
             return Response(
                 {'error': 'Expense not found'},
@@ -353,10 +341,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         user = request.user
         rejection_reason = request.data.get('reason', '')
         
-        # Get user's role
-        from organizations.models import OrganizationMember
-        member = OrganizationMember.objects.filter(user=user).first()
-        
+        member = get_active_membership(user, request)
+
         if not member or member.role != 'OWNER':
             return Response(
                 {'error': 'Only owners can reject expenses'},
@@ -365,7 +351,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         
         # Get expense from organization (not filtered by user)
         try:
-            expense = Expense.objects.get(pk=pk, organization=member.organization)
+            expense = Expense.objects.select_related('user', 'organization').get(pk=pk, organization=member.organization)
         except Expense.DoesNotExist:
             return Response(
                 {'error': 'Expense not found'},
@@ -412,20 +398,21 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         """Get vendor spending analytics"""
         user = request.user
         
-        # Get user's role
-        from organizations.models import OrganizationMember
-        member = OrganizationMember.objects.filter(user=user).first()
-        
-        # Determine which expenses to include
+        member = get_active_membership(user, request)
+
         if member and member.role == 'OWNER':
-            # OWNER sees all organization expenses (only APPROVED)
             expenses = Expense.objects.filter(
                 organization=member.organization,
                 status='APPROVED',
                 vendor__isnull=False
             ).exclude(vendor='')
+        elif member:
+            expenses = Expense.objects.filter(
+                user=user,
+                organization=member.organization,
+                vendor__isnull=False
+            ).exclude(vendor='')
         else:
-            # STAFF see only their own expenses
             expenses = Expense.objects.filter(
                 user=user,
                 vendor__isnull=False
@@ -461,19 +448,17 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def export_csv(self, request):
         """Export expenses to CSV"""
-        import csv
         from django.http import HttpResponse
-        from datetime import datetime
+        import csv
         
         user = request.user
         
-        # Get user's role
-        from organizations.models import OrganizationMember
-        member = OrganizationMember.objects.filter(user=user).first()
-        
-        # Determine which expenses to include
+        member = get_active_membership(user, request)
+
         if member and member.role == 'OWNER':
             expenses = Expense.objects.filter(organization=member.organization)
+        elif member:
+            expenses = Expense.objects.filter(user=user, organization=member.organization)
         else:
             expenses = Expense.objects.filter(user=user)
         
@@ -482,6 +467,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         category_filter = request.query_params.get('category')
         date_from = request.query_params.get('date_from')
         date_to = request.query_params.get('date_to')
+        search = request.query_params.get('search')
         
         if status_filter:
             expenses = expenses.filter(status=status_filter.upper())
@@ -491,42 +477,73 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             expenses = expenses.filter(date__gte=date_from)
         if date_to:
             expenses = expenses.filter(date__lte=date_to)
+        if search:
+            expenses = expenses.filter(
+                Q(title__icontains=search)
+                | Q(description__icontains=search)
+                | Q(vendor__icontains=search)
+                | Q(user__username__icontains=search)
+                | Q(user__email__icontains=search)
+            )
         
         # Order by date
-        expenses = expenses.order_by('-date', '-created_at')
+        expenses = expenses.select_related('user', 'organization').order_by('-date', '-created_at')
+        total_amount = expenses.aggregate(total=Sum('amount'))['total'] or 0
         
         # Create CSV response
-        response = HttpResponse(content_type='text/csv')
-        filename = f'expenses_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response.write('\ufeff')
+        filename = f'expenses_{timezone.now().strftime("%Y%m%d_%H%M%S")}.csv'
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
         writer = csv.writer(response)
         
         # Write header
         writer.writerow([
+            'Expense ID',
+            'Organization',
             'Date',
             'Title',
-            'Category',
+            'Category Code',
+            'Category Label',
             'Vendor',
-            'Amount',
-            'Status',
+            'Amount NPR',
+            'Status Code',
+            'Status Label',
             'Description',
-            'Submitted By',
-            'Created At'
+            'Submitted By Name',
+            'Submitted By Username',
+            'Submitted By Email',
+            'Created At',
+            'Updated At',
+            'Receipt Attached',
         ])
         
         # Write data
         for expense in expenses:
+            created_at = timezone.localtime(expense.created_at).strftime('%Y-%m-%d %H:%M:%S')
+            updated_at = timezone.localtime(expense.updated_at).strftime('%Y-%m-%d %H:%M:%S')
             writer.writerow([
+                expense.id,
+                expense.organization.name if expense.organization else '',
                 expense.date.strftime('%Y-%m-%d'),
                 expense.title,
+                expense.category,
                 expense.get_category_display(),
                 expense.vendor or '',
-                str(expense.amount),
+                f'{expense.amount:.2f}',
+                expense.status,
                 expense.get_status_display(),
                 expense.description or '',
                 expense.user.get_full_name() or expense.user.username,
-                expense.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                expense.user.username,
+                expense.user.email,
+                created_at,
+                updated_at,
+                'Yes' if hasattr(expense, 'receipt') else 'No',
             ])
+
+        writer.writerow([])
+        writer.writerow(['TOTAL', '', '', '', '', '', '', f'{total_amount:.2f}', '', '', '', '', '', '', '', '', ''])
         
         return response

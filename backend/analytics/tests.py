@@ -1,3 +1,283 @@
-from django.test import TestCase
+from datetime import date, timedelta
+from decimal import Decimal
+from unittest.mock import patch
 
-# Create your tests here.
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from rest_framework import status
+from rest_framework.test import APIClient
+
+from analytics.ai_insights import AIInsightError
+from budgets.models import Budget
+from expenses.models import Expense
+from organizations.models import Organization, OrganizationMember
+
+User = get_user_model()
+
+
+class AnalyticsEndpointTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.owner = User.objects.create_user(
+            username='analyticsowner',
+            email='analytics-owner@example.com',
+            password='StrongPass123!',
+            email_verified=True,
+        )
+        self.staff = User.objects.create_user(
+            username='analyticsstaff',
+            email='analytics-staff@example.com',
+            password='StrongPass123!',
+            email_verified=True,
+        )
+        self.other_owner = User.objects.create_user(
+            username='analyticsother',
+            email='analytics-other@example.com',
+            password='StrongPass123!',
+            email_verified=True,
+        )
+        self.organization = Organization.objects.create(name='Analytics Org')
+        self.other_organization = Organization.objects.create(name='Other Analytics Org')
+        OrganizationMember.objects.create(user=self.owner, organization=self.organization, role='OWNER')
+        OrganizationMember.objects.create(user=self.staff, organization=self.organization, role='STAFF')
+        OrganizationMember.objects.create(user=self.other_owner, organization=self.other_organization, role='OWNER')
+        self.owner.active_organization = self.organization
+        self.owner.save(update_fields=['active_organization'])
+        self.staff.active_organization = self.organization
+        self.staff.save(update_fields=['active_organization'])
+        self.other_owner.active_organization = self.other_organization
+        self.other_owner.save(update_fields=['active_organization'])
+
+        today = date.today()
+        self.owner_food = Expense.objects.create(
+            organization=self.organization,
+            user=self.owner,
+            title='Owner lunch',
+            amount=Decimal('100.00'),
+            category='FOOD',
+            vendor='Cafe A',
+            date=today,
+            status='APPROVED',
+        )
+        self.staff_transport = Expense.objects.create(
+            organization=self.organization,
+            user=self.staff,
+            title='Staff taxi',
+            amount=Decimal('50.00'),
+            category='TRANSPORT',
+            vendor='Taxi Co',
+            date=today,
+            status='APPROVED',
+        )
+        Expense.objects.create(
+            organization=self.organization,
+            user=self.staff,
+            title='Pending staff meal',
+            amount=Decimal('25.00'),
+            category='FOOD',
+            vendor='Cafe A',
+            date=today,
+            status='PENDING',
+        )
+        Expense.objects.create(
+            organization=self.other_organization,
+            user=self.other_owner,
+            title='Other org expense',
+            amount=Decimal('900.00'),
+            category='OTHER',
+            vendor='Other Vendor',
+            date=today,
+            status='APPROVED',
+        )
+        self.budget = Budget.objects.create(
+            organization=self.organization,
+            name='Food Budget',
+            amount=Decimal('300.00'),
+            period='MONTHLY',
+            category='FOOD',
+            start_date=today.replace(day=1),
+            end_date=today + timedelta(days=30),
+            created_by=self.owner,
+        )
+
+    def authenticate(self, user):
+        self.client.force_authenticate(user)
+
+    def test_owner_category_breakdown_uses_org_approved_expenses_only(self):
+        self.authenticate(self.owner)
+
+        response = self.client.get('/api/analytics/category-breakdown/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['scope'], 'organization')
+        self.assertEqual(response.data['total_amount'], 150.0)
+        categories = {item['category']: item for item in response.data['breakdown']}
+        self.assertEqual(categories['FOOD']['total'], 100.0)
+        self.assertEqual(categories['TRANSPORT']['total'], 50.0)
+        self.assertNotIn('OTHER', categories)
+
+    def test_staff_analytics_scope_is_personal_approved_spend(self):
+        self.authenticate(self.staff)
+
+        response = self.client.get('/api/analytics/overview/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['scope'], 'personal')
+        self.assertEqual(response.data['total_spent'], 50.0)
+        self.assertEqual(response.data['transaction_count'], 1)
+
+    def test_spending_trends_validates_period_and_date_range(self):
+        self.authenticate(self.owner)
+
+        bad_period = self.client.get('/api/analytics/spending-trends/?period=hourly')
+        self.assertEqual(bad_period.status_code, status.HTTP_400_BAD_REQUEST)
+
+        bad_range = self.client.get('/api/analytics/spending-trends/?start_date=2026-02-01&end_date=2026-01-01')
+        self.assertEqual(bad_range.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_vendor_summary_limits_and_sorts_vendors(self):
+        self.authenticate(self.owner)
+
+        response = self.client.get('/api/analytics/vendor-summary/?limit=1')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['vendors']), 1)
+        self.assertEqual(response.data['vendors'][0]['vendor'], 'Cafe A')
+        self.assertEqual(response.data['vendors'][0]['total'], 100.0)
+
+    def test_budget_burn_rate_returns_projection_data(self):
+        self.authenticate(self.owner)
+
+        response = self.client.get('/api/analytics/budget-burn-rate/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['budgets']), 1)
+        budget = response.data['budgets'][0]
+        self.assertEqual(budget['budget_id'], self.budget.id)
+        self.assertEqual(budget['spent_amount'], 100.0)
+        self.assertEqual(budget['budget_amount'], 300.0)
+        self.assertIn('projected_spend', budget)
+        self.assertIn('is_projected_over_budget', budget)
+
+    def test_ai_insights_returns_provider_summary(self):
+        self.authenticate(self.owner)
+        provider_summary = {
+            'summary': 'Food is the main month-to-date driver.',
+            'highlights': ['Food totals 100.0 this month.'],
+            'risks': ['No major budget risk is visible.'],
+            'recommendations': ['Review food vendors before month close.'],
+            'provider': 'nvidia',
+            'model': 'moonshotai/kimi-k2.6',
+        }
+
+        with patch('analytics.views.generate_ai_insight', return_value=provider_summary) as generate:
+            response = self.client.get('/api/analytics/ai-insights/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['generated_by_ai'])
+        self.assertEqual(response.data['summary'], provider_summary['summary'])
+        self.assertEqual(response.data['provider'], 'nvidia')
+        self.assertIn('snapshot_metrics', response.data)
+        snapshot = generate.call_args.args[0]
+        self.assertEqual(snapshot['scope'], 'organization')
+        self.assertIn('top_categories', snapshot)
+
+    def test_ai_insights_falls_back_when_provider_fails(self):
+        self.authenticate(self.owner)
+
+        with patch('analytics.views.generate_ai_insight', side_effect=AIInsightError('provider down')):
+            response = self.client.get('/api/analytics/ai-insights/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['generated_by_ai'])
+        self.assertEqual(response.data['provider'], 'fallback')
+        self.assertTrue(response.data['summary'])
+        self.assertGreaterEqual(len(response.data['recommendations']), 1)
+
+    def test_anomalies_flags_high_amount_and_duplicate_candidates(self):
+        today = date.today()
+        for index, amount in enumerate(['95.00', '100.00', '105.00'], start=1):
+            Expense.objects.create(
+                organization=self.organization,
+                user=self.owner,
+                title=f'Historical meal {index}',
+                amount=Decimal(amount),
+                category='FOOD',
+                vendor='Cafe A',
+                date=today - timedelta(days=10 + index),
+                status='APPROVED',
+            )
+        high_expense = Expense.objects.create(
+            organization=self.organization,
+            user=self.staff,
+            title='Suspicious team dinner',
+            amount=Decimal('500.00'),
+            category='FOOD',
+            vendor='Cafe A',
+            date=today,
+            status='PENDING',
+        )
+        duplicate = Expense.objects.create(
+            organization=self.organization,
+            user=self.owner,
+            title='Duplicate team dinner',
+            amount=Decimal('500.00'),
+            category='FOOD',
+            vendor='Cafe A',
+            date=today,
+            status='APPROVED',
+        )
+
+        self.authenticate(self.owner)
+        response = self.client.get('/api/analytics/anomalies/?amount_multiplier=2&minimum_baseline_count=3&limit=10')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        anomalies = {item['expense_id']: item for item in response.data['anomalies']}
+        self.assertIn(high_expense.id, anomalies)
+        reason_codes = {reason['code'] for reason in anomalies[high_expense.id]['reasons']}
+        self.assertIn('HIGH_CATEGORY_AMOUNT', reason_codes)
+        self.assertIn('HIGH_VENDOR_AMOUNT', reason_codes)
+        self.assertIn('DUPLICATE_CANDIDATE', reason_codes)
+        duplicate_reason = next(reason for reason in anomalies[high_expense.id]['reasons'] if reason['code'] == 'DUPLICATE_CANDIDATE')
+        self.assertIn(duplicate.id, duplicate_reason['matching_expense_ids'])
+
+    def test_staff_anomalies_scope_to_own_expenses(self):
+        today = date.today()
+        for index in range(3):
+            Expense.objects.create(
+                organization=self.organization,
+                user=self.owner,
+                title=f'Owner baseline {index}',
+                amount=Decimal('100.00'),
+                category='OFFICE',
+                vendor='Office Vendor',
+                date=today - timedelta(days=20 + index),
+                status='APPROVED',
+            )
+        owner_anomaly = Expense.objects.create(
+            organization=self.organization,
+            user=self.owner,
+            title='Owner large office buy',
+            amount=Decimal('600.00'),
+            category='OFFICE',
+            vendor='Office Vendor',
+            date=today,
+            status='PENDING',
+        )
+
+        self.authenticate(self.staff)
+        response = self.client.get('/api/analytics/anomalies/?amount_multiplier=2&minimum_baseline_count=3')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['scope'], 'personal')
+        flagged_ids = {item['expense_id'] for item in response.data['anomalies']}
+        self.assertNotIn(owner_anomaly.id, flagged_ids)
+
+    def test_anomalies_validate_query_params(self):
+        self.authenticate(self.owner)
+
+        bad_multiplier = self.client.get('/api/analytics/anomalies/?amount_multiplier=1')
+        self.assertEqual(bad_multiplier.status_code, status.HTTP_400_BAD_REQUEST)
+
+        bad_limit = self.client.get('/api/analytics/anomalies/?limit=0')
+        self.assertEqual(bad_limit.status_code, status.HTTP_400_BAD_REQUEST)

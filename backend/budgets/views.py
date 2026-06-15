@@ -1,11 +1,16 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.db.models import Sum, Count
+from decimal import Decimal
 from .models import Budget, BudgetAlert
 from .serializers import BudgetSerializer, BudgetAlertSerializer
 from .emails import send_budget_alert_email
 from notifications.utils import notify_budget_alert, notify_budget_exceeded
+from organizations.context import get_active_membership
+from organizations.models import OrganizationMember
 
 
 class BudgetViewSet(viewsets.ModelViewSet):
@@ -15,23 +20,19 @@ class BudgetViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Return budgets for user's organization"""
         user = self.request.user
-        from organizations.models import OrganizationMember
-        
-        member = OrganizationMember.objects.filter(user=user).first()
+        member = get_active_membership(user, self.request)
         if member:
-            return Budget.objects.filter(organization=member.organization)
+            return Budget.objects.filter(organization=member.organization).select_related('organization', 'created_by')
         return Budget.objects.none()
     
     def perform_create(self, serializer):
         """Create budget and associate with user's organization"""
         user = self.request.user
-        from organizations.models import OrganizationMember
-        
-        member = OrganizationMember.objects.filter(user=user).first()
+        member = get_active_membership(user, self.request)
         
         # Only OWNER can create budgets
         if not member or member.role != 'OWNER':
-            raise PermissionError('Only owners can create budgets')
+            raise PermissionDenied('Only owners can create budgets')
         
         serializer.save(
             organization=member.organization,
@@ -44,13 +45,11 @@ class BudgetViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         """Update budget"""
         user = self.request.user
-        from organizations.models import OrganizationMember
-        
-        member = OrganizationMember.objects.filter(user=user).first()
+        member = get_active_membership(user, self.request)
         
         # Only OWNER can update budgets
         if not member or member.role != 'OWNER':
-            raise PermissionError('Only owners can update budgets')
+            raise PermissionDenied('Only owners can update budgets')
         
         serializer.save()
         
@@ -82,20 +81,16 @@ class BudgetViewSet(viewsets.ModelViewSet):
                 )
                 
                 # Send email to owners
-                from organizations.models import OrganizationMember
-                recipients = OrganizationMember.objects.filter(
-                    organization=budget.organization,
-                    role='OWNER'
-                ).values_list('user__email', flat=True)
-                
-                if recipients:
-                    send_budget_alert_email(budget, spent_amount, list(recipients))
-                
-                # Create in-app notifications
                 owners = OrganizationMember.objects.filter(
                     organization=budget.organization,
                     role='OWNER'
-                )
+                ).select_related('user')
+                recipients = [owner.user.email for owner in owners if owner.user.email]
+                
+                if recipients:
+                    send_budget_alert_email(budget, spent_amount, recipients)
+                
+                # Create in-app notifications
                 for owner in owners:
                     notify_budget_exceeded(owner.user, budget, spent_amount, percentage_used)
         
@@ -118,11 +113,10 @@ class BudgetViewSet(viewsets.ModelViewSet):
                 )
                 
                 # Create in-app notifications for threshold
-                from organizations.models import OrganizationMember
                 owners = OrganizationMember.objects.filter(
                     organization=budget.organization,
                     role='OWNER'
-                )
+                ).select_related('user')
                 for owner in owners:
                     notify_budget_alert(owner.user, budget, spent_amount, percentage_used)
     
@@ -130,10 +124,8 @@ class BudgetViewSet(viewsets.ModelViewSet):
     def check_all_alerts(self, request):
         """Manually trigger alert check for all active budgets (OWNER only)"""
         user = request.user
-        from organizations.models import OrganizationMember
-        
-        member = OrganizationMember.objects.filter(user=user).first()
-        
+        member = get_active_membership(user, request)
+
         # Only OWNER can trigger this
         if not member or member.role != 'OWNER':
             return Response(
@@ -191,12 +183,9 @@ class BudgetViewSet(viewsets.ModelViewSet):
     def category_breakdown(self, request):
         """Get spending breakdown by category with budget comparison"""
         from expenses.models import Expense
-        from organizations.models import OrganizationMember
-        from django.db.models import Sum, Count
-        from decimal import Decimal
         
         user = request.user
-        member = OrganizationMember.objects.filter(user=user).first()
+        member = get_active_membership(user, request)
         
         if not member:
             return Response({'error': 'User not in organization'}, status=400)
@@ -207,25 +196,34 @@ class BudgetViewSet(viewsets.ModelViewSet):
             'SALARY', 'RENT', 'MARKETING', 'OTHER'
         ]
         
-        category_data = []
-        
-        for category in categories:
-            # Get expenses for this category
-            expenses = Expense.objects.filter(
+        expense_stats = {
+            row['category']: row
+            for row in Expense.objects.filter(
                 organization=member.organization,
-                category=category,
+                category__in=categories,
                 status='APPROVED'
+            ).values('category').annotate(
+                total=Sum('amount'),
+                count=Count('id')
             )
-            
-            spent = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0')
-            count = expenses.count()
-            
-            # Get budget for this category (if exists)
-            budget = Budget.objects.filter(
-                organization=member.organization,
-                category=category,
-                is_active=True
-            ).first()
+        }
+
+        budgets_by_category = {}
+        active_budgets = Budget.objects.filter(
+            organization=member.organization,
+            category__in=categories,
+            is_active=True
+        ).select_related('organization', 'created_by').order_by('category', '-created_at')
+        for budget in active_budgets:
+            budgets_by_category.setdefault(budget.category, budget)
+
+        category_data = []
+
+        for category in categories:
+            stat = expense_stats.get(category, {})
+            spent = stat.get('total') or Decimal('0')
+            count = stat.get('count') or 0
+            budget = budgets_by_category.get(category)
             
             category_info = {
                 'category': category,
@@ -260,11 +258,11 @@ class BudgetAlertViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Return alerts for user's organization budgets"""
         user = self.request.user
-        from organizations.models import OrganizationMember
-        
-        member = OrganizationMember.objects.filter(user=user).first()
+        member = get_active_membership(user, self.request)
         if member:
-            return BudgetAlert.objects.filter(budget__organization=member.organization)
+            return BudgetAlert.objects.filter(
+                budget__organization=member.organization
+            ).select_related('budget', 'budget__organization')
         return BudgetAlert.objects.none()
     
     @action(detail=True, methods=['post'])

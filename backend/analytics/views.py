@@ -1,149 +1,132 @@
+from datetime import date, timedelta
+from decimal import Decimal
+
+from django.db.models import Avg, Count, Sum
+from django.db.models.functions import TruncDay, TruncMonth, TruncWeek
+from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.db.models import Sum, Count, Q
-from django.db.models.functions import TruncDate, TruncWeek, TruncMonth, TruncDay
-from datetime import datetime, timedelta
+
+from budgets.models import Budget
+from .ai_insights import AIInsightError, generate_ai_insight
 from expenses.models import Expense
-from organizations.models import OrganizationMember
+from organizations.context import get_active_membership
+
+PERIOD_TRUNCATORS = {
+    'daily': TruncDay,
+    'weekly': TruncWeek,
+    'monthly': TruncMonth,
+}
+
+PERIOD_TYPES = {'day', 'week', 'month', 'year'}
+ANOMALY_STATUSES = {'APPROVED', 'PENDING'}
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def spending_trends(request):
-    """
-    Get spending trends over time with configurable period (daily, weekly, monthly)
-    """
-    user = request.user
-    period = request.query_params.get('period', 'daily')  # daily, weekly, monthly
-    start_date = request.query_params.get('start_date')
-    end_date = request.query_params.get('end_date')
-    
-    # Get user's organization and role
+def money(value):
+    return float(value or Decimal('0'))
+
+
+def percent(numerator, denominator, precision=2):
+    denominator = Decimal(str(denominator or 0))
+    numerator = Decimal(str(numerator or 0))
+    if denominator <= 0:
+        return 0
+    return round(float((numerator / denominator) * Decimal('100')), precision)
+
+
+def parse_date_param(request, name):
+    value = request.query_params.get(name)
+    if not value:
+        return None
     try:
-        member = OrganizationMember.objects.get(user=user)
-        organization = member.organization
-        role = member.role
-    except OrganizationMember.DoesNotExist:
-        return Response({'error': 'User not part of any organization'}, status=400)
-    
-    # Base queryset
-    if role in ['OWNER', 'MANAGER']:
-        expenses = Expense.objects.filter(
-            organization=organization,
-            status='APPROVED'
-        )
-    else:
-        expenses = Expense.objects.filter(user=user)
-    
-    # Apply date filters
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValidationError({name: 'Use YYYY-MM-DD format.'}) from exc
+
+
+def get_member_or_error(request):
+    member = get_active_membership(request.user, request)
+    if not member:
+        raise ValidationError({'organization': 'Select or join a workspace first.'})
+    return member
+
+
+def scoped_expenses(request):
+    """
+    Approved spend analytics only. Owners see organization spend; staff see their own approved spend.
+    """
+    member = get_member_or_error(request)
+    queryset = Expense.objects.filter(organization=member.organization, status='APPROVED')
+    if member.role != 'OWNER':
+        queryset = queryset.filter(user=request.user)
+    return queryset, member
+
+
+def apply_date_filters(queryset, request):
+    start_date = parse_date_param(request, 'start_date')
+    end_date = parse_date_param(request, 'end_date')
+    if start_date and end_date and start_date > end_date:
+        raise ValidationError({'date_range': 'start_date cannot be after end_date.'})
     if start_date:
-        expenses = expenses.filter(date__gte=start_date)
+        queryset = queryset.filter(date__gte=start_date)
     if end_date:
-        expenses = expenses.filter(date__lte=end_date)
-    
-    # Group by period
-    if period == 'daily':
-        trunc_func = TruncDay
-    elif period == 'weekly':
-        trunc_func = TruncWeek
-    else:  # monthly
-        trunc_func = TruncMonth
-    
-    trends = expenses.annotate(
-        period=trunc_func('date')
-    ).values('period').annotate(
-        total=Sum('amount'),
-        count=Count('id')
-    ).order_by('period')
-    
-    return Response({
-        'period': period,
-        'trends': list(trends)
-    })
+        queryset = queryset.filter(date__lte=end_date)
+    return queryset, start_date, end_date
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def category_breakdown(request):
-    """
-    Get spending breakdown by category
-    """
-    user = request.user
-    start_date = request.query_params.get('start_date')
-    end_date = request.query_params.get('end_date')
-    
-    # Get user's organization and role
+def parse_limit(request, default=10, maximum=50):
+    raw_limit = request.query_params.get('limit', default)
     try:
-        member = OrganizationMember.objects.get(user=user)
-        organization = member.organization
-        role = member.role
-    except OrganizationMember.DoesNotExist:
-        return Response({'error': 'User not part of any organization'}, status=400)
-    
-    # Base queryset
-    if role in ['OWNER', 'MANAGER']:
-        expenses = Expense.objects.filter(
-            organization=organization,
-            status='APPROVED'
-        )
-    else:
-        expenses = Expense.objects.filter(user=user)
-    
-    # Apply date filters
-    if start_date:
-        expenses = expenses.filter(date__gte=start_date)
-    if end_date:
-        expenses = expenses.filter(date__lte=end_date)
-    
-    # Group by category
-    breakdown = expenses.values('category').annotate(
-        total=Sum('amount'),
-        count=Count('id')
-    ).order_by('-total')
-    
-    # Calculate total for percentages
-    total_amount = expenses.aggregate(total=Sum('amount'))['total'] or 0
-    
-    # Add percentage to each category
-    breakdown_list = list(breakdown)
-    for item in breakdown_list:
-        if total_amount > 0:
-            item['percentage'] = round((item['total'] / total_amount) * 100, 2)
-        else:
-            item['percentage'] = 0
-    
-    return Response({
-        'breakdown': breakdown_list,
-        'total_amount': total_amount
-    })
+        limit = int(raw_limit)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError({'limit': 'Use a positive integer.'}) from exc
+    if limit < 1:
+        raise ValidationError({'limit': 'Use a positive integer.'})
+    return min(limit, maximum)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def period_comparison(request):
-    """
-    Compare spending between two periods (current vs previous)
-    """
-    user = request.user
-    period_type = request.query_params.get('period_type', 'month')  # week, month, year
-    
-    # Get user's organization and role
+def parse_positive_int(request, name, default, maximum):
+    raw_value = request.query_params.get(name, default)
     try:
-        member = OrganizationMember.objects.get(user=user)
-        organization = member.organization
-        role = member.role
-    except OrganizationMember.DoesNotExist:
-        return Response({'error': 'User not part of any organization'}, status=400)
-    
-    # Calculate date ranges
-    today = datetime.now().date()
-    
+        value = int(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError({name: 'Use a positive integer.'}) from exc
+    if value < 1:
+        raise ValidationError({name: 'Use a positive integer.'})
+    return min(value, maximum)
+
+
+def summarize_queryset(queryset):
+    summary = queryset.aggregate(total=Sum('amount'), count=Count('id'))
+    return {
+        'total': money(summary['total']),
+        'count': summary['count'] or 0,
+    }
+
+
+def scoped_anomaly_expenses(request):
+    """
+    Anomaly detection includes pending and approved spend so owners can review suspicious submissions early.
+    """
+    member = get_member_or_error(request)
+    queryset = Expense.objects.filter(
+        organization=member.organization,
+        status__in=ANOMALY_STATUSES,
+    ).select_related('user', 'organization')
+    if member.role != 'OWNER':
+        queryset = queryset.filter(user=request.user)
+    return queryset, member
+
+
+def current_and_previous_period(period_type):
+    today = timezone.now().date()
     if period_type == 'day':
         current_start = today
         current_end = today
         previous_start = today - timedelta(days=1)
-        previous_end = today - timedelta(days=1)
+        previous_end = previous_start
     elif period_type == 'week':
         current_start = today - timedelta(days=today.weekday())
         current_end = today
@@ -154,59 +137,642 @@ def period_comparison(request):
         current_end = today
         previous_start = current_start.replace(year=current_start.year - 1)
         previous_end = current_start - timedelta(days=1)
-    else:  # month
+    else:
         current_start = today.replace(day=1)
         current_end = today
-        if current_start.month == 1:
-            previous_start = current_start.replace(year=current_start.year - 1, month=12)
-        else:
-            previous_start = current_start.replace(month=current_start.month - 1)
         previous_end = current_start - timedelta(days=1)
-    
-    # Base queryset
-    if role in ['OWNER', 'MANAGER']:
-        base_expenses = Expense.objects.filter(
-            organization=organization,
-            status='APPROVED'
-        )
+        previous_start = previous_end.replace(day=1)
+    return current_start, current_end, previous_start, previous_end
+
+
+def budget_bounds(budget):
+    today = timezone.now().date()
+    if budget.start_date and budget.end_date:
+        return budget.start_date, budget.end_date
+    if budget.period == 'DAILY':
+        return today, today
+    if budget.period == 'WEEKLY':
+        start = today - timedelta(days=today.weekday())
+        return start, start + timedelta(days=6)
+    if budget.period == 'YEARLY':
+        return today.replace(month=1, day=1), today.replace(month=12, day=31)
+    start = today.replace(day=1)
+    if today.month == 12:
+        end = today.replace(day=31)
     else:
-        base_expenses = Expense.objects.filter(user=user)
-    
-    # Current period
-    current_expenses = base_expenses.filter(
-        date__gte=current_start,
-        date__lte=current_end
-    )
-    current_total = current_expenses.aggregate(total=Sum('amount'))['total'] or 0
-    current_count = current_expenses.count()
-    
-    # Previous period
-    previous_expenses = base_expenses.filter(
-        date__gte=previous_start,
-        date__lte=previous_end
-    )
-    previous_total = previous_expenses.aggregate(total=Sum('amount'))['total'] or 0
-    previous_count = previous_expenses.count()
-    
-    # Calculate change
+        end = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+    return start, end
+
+
+def current_month_bounds():
+    today = timezone.now().date()
+    current_start = today.replace(day=1)
+    current_end = today
+    previous_end = current_start - timedelta(days=1)
+    previous_start = previous_end.replace(day=1)
+    return current_start, current_end, previous_start, previous_end
+
+
+def period_change(current_total, previous_total):
+    current_total = Decimal(str(current_total or 0))
+    previous_total = Decimal(str(previous_total or 0))
     if previous_total > 0:
-        change_percentage = round(((current_total - previous_total) / previous_total) * 100, 2)
+        return round(float(((current_total - previous_total) / previous_total) * Decimal('100')), 2)
+    return 0 if current_total == 0 else 100
+
+
+def severity_from_score(score):
+    if score >= 80:
+        return 'HIGH'
+    if score >= 50:
+        return 'MEDIUM'
+    return 'LOW'
+
+
+def build_expense_snapshot(expense):
+    return {
+        'expense_id': expense.id,
+        'title': expense.title,
+        'amount': money(expense.amount),
+        'category': expense.category,
+        'vendor': expense.vendor or '',
+        'date': expense.date,
+        'status': expense.status,
+        'user_id': expense.user_id,
+        'user_name': expense.user.get_full_name() or expense.user.username,
+    }
+
+
+def top_category_rows(queryset, limit=5):
+    return [
+        {
+            'category': row['category'],
+            'total': money(row['total']),
+            'count': row['count'],
+        }
+        for row in queryset.values('category').annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('-total')[:limit]
+    ]
+
+
+def top_vendor_rows(queryset, limit=5):
+    return [
+        {
+            'vendor': row['vendor'],
+            'total': money(row['total']),
+            'count': row['count'],
+        }
+        for row in queryset.exclude(vendor__isnull=True).exclude(vendor='').values('vendor').annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('-total')[:limit]
+    ]
+
+
+def budget_risk_rows(member, limit=5):
+    today = timezone.now().date()
+    budgets = Budget.objects.filter(
+        organization=member.organization,
+        is_active=True,
+    ).order_by('category', 'name')
+
+    risks = []
+    for budget in budgets:
+        start, end = budget_bounds(budget)
+        expense_filter = {
+            'organization': member.organization,
+            'status': 'APPROVED',
+            'date__gte': start,
+            'date__lte': end,
+        }
+        if budget.category != 'ALL':
+            expense_filter['category'] = budget.category
+        spent = Expense.objects.filter(**expense_filter).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        days_total = max((end - start).days + 1, 1)
+        elapsed_end = min(max(today, start), end)
+        days_elapsed = max((elapsed_end - start).days + 1, 1)
+        projected_spend = (spent / Decimal(days_elapsed)) * Decimal(days_total)
+        projected_percentage = percent(projected_spend, budget.amount, precision=1)
+
+        if spent > budget.amount or projected_percentage >= 80:
+            risks.append({
+                'budget_id': budget.id,
+                'name': budget.name,
+                'category': budget.category,
+                'budget_amount': money(budget.amount),
+                'spent_amount': money(spent),
+                'projected_spend': money(projected_spend),
+                'projected_percentage_used': projected_percentage,
+                'is_over_budget': spent > budget.amount,
+            })
+
+    risks.sort(key=lambda row: (row['is_over_budget'], row['projected_percentage_used']), reverse=True)
+    return risks[:limit]
+
+
+def anomaly_rows_for_insights(request, limit=5):
+    expenses, member = scoped_anomaly_expenses(request)
+    today = timezone.now().date()
+    base_queryset = expenses.filter(date__gte=today - timedelta(days=180), date__lte=today)
+    candidates = base_queryset.order_by('-date', '-created_at')[:limit * 4]
+    rows = []
+    for expense in candidates:
+        anomaly = detect_expense_anomalies(
+            expense,
+            base_queryset,
+            amount_multiplier=Decimal('2.5'),
+            minimum_baseline_count=3,
+            duplicate_window_days=3,
+        )
+        if anomaly:
+            rows.append({
+                'expense_id': anomaly['expense_id'],
+                'title': anomaly['title'],
+                'amount': anomaly['amount'],
+                'category': anomaly['category'],
+                'vendor': anomaly['vendor'],
+                'severity': anomaly['severity'],
+                'score': anomaly['score'],
+                'reason_codes': [reason['code'] for reason in anomaly['reasons']],
+            })
+    rows.sort(key=lambda item: item['score'], reverse=True)
+    return rows[:limit], member
+
+
+def build_ai_insight_snapshot(request):
+    base_expenses, member = scoped_expenses(request)
+    current_start, current_end, previous_start, previous_end = current_month_bounds()
+    current_expenses = base_expenses.filter(date__gte=current_start, date__lte=current_end)
+    previous_expenses = base_expenses.filter(date__gte=previous_start, date__lte=previous_end)
+    current_summary = summarize_queryset(current_expenses)
+    previous_summary = summarize_queryset(previous_expenses)
+    anomalies_summary, _ = anomaly_rows_for_insights(request)
+
+    return {
+        'organization_id': member.organization_id,
+        'scope': 'organization' if member.role == 'OWNER' else 'personal',
+        'period': {
+            'type': 'month_to_date',
+            'current_start': current_start,
+            'current_end': current_end,
+            'previous_start': previous_start,
+            'previous_end': previous_end,
+        },
+        'current_period': current_summary,
+        'previous_period': previous_summary,
+        'change_percentage': period_change(current_summary['total'], previous_summary['total']),
+        'top_categories': top_category_rows(current_expenses, limit=5),
+        'top_vendors': top_vendor_rows(current_expenses, limit=5),
+        'budget_risks': budget_risk_rows(member, limit=5),
+        'anomalies': anomalies_summary,
+    }
+
+
+def fallback_ai_insight(snapshot):
+    top_category = snapshot['top_categories'][0] if snapshot['top_categories'] else None
+    top_vendor = snapshot['top_vendors'][0] if snapshot['top_vendors'] else None
+    risk_count = len(snapshot['budget_risks']) + len(snapshot['anomalies'])
+    summary = (
+        f"Month-to-date spend is {snapshot['current_period']['total']} across "
+        f"{snapshot['current_period']['count']} approved transactions."
+    )
+    highlights = [
+        f"Spend changed {snapshot['change_percentage']}% versus the previous month-to-date period.",
+    ]
+    if top_category:
+        highlights.append(f"{top_category['category']} is the largest category at {top_category['total']}.")
+    if top_vendor:
+        highlights.append(f"{top_vendor['vendor']} is the top vendor at {top_vendor['total']}.")
+
+    risks = []
+    if snapshot['budget_risks']:
+        risks.append(f"{len(snapshot['budget_risks'])} budget areas are projected near or over limit.")
+    if snapshot['anomalies']:
+        risks.append(f"{len(snapshot['anomalies'])} expenses have anomaly signals.")
+    if not risks:
+        risks.append('No major budget or anomaly risks are visible in the current snapshot.')
+
+    recommendations = [
+        'Review the highest category before approving new discretionary spend.',
+        'Check anomaly and budget-risk items before closing the finance cycle.',
+    ]
+    if risk_count == 0:
+        recommendations.append('Keep receipt capture and categorization discipline consistent.')
+
+    return {
+        'summary': summary,
+        'highlights': highlights[:3],
+        'risks': risks[:3],
+        'recommendations': recommendations[:3],
+        'provider': 'fallback',
+        'model': '',
+    }
+
+
+def category_baseline(base_queryset, expense, minimum_count):
+    baseline = base_queryset.filter(
+        category=expense.category,
+        date__lt=expense.date,
+    ).exclude(id=expense.id).aggregate(avg=Avg('amount'), count=Count('id'))
+    if (baseline['count'] or 0) < minimum_count or not baseline['avg']:
+        return None
+    return baseline
+
+
+def vendor_baseline(base_queryset, expense, minimum_count):
+    if not expense.vendor:
+        return None
+    baseline = base_queryset.filter(
+        vendor__iexact=expense.vendor,
+        date__lt=expense.date,
+    ).exclude(id=expense.id).aggregate(avg=Avg('amount'), count=Count('id'))
+    if (baseline['count'] or 0) < minimum_count or not baseline['avg']:
+        return None
+    return baseline
+
+
+def duplicate_candidates(base_queryset, expense, window_days):
+    start = expense.date - timedelta(days=window_days)
+    end = expense.date + timedelta(days=window_days)
+    queryset = base_queryset.filter(
+        amount=expense.amount,
+        category=expense.category,
+        date__gte=start,
+        date__lte=end,
+    ).exclude(id=expense.id)
+    if expense.vendor:
+        queryset = queryset.filter(vendor__iexact=expense.vendor)
+    return list(queryset.order_by('-date', '-created_at')[:5])
+
+
+def is_new_vendor(base_queryset, expense):
+    if not expense.vendor:
+        return False
+    return not base_queryset.filter(
+        vendor__iexact=expense.vendor,
+        date__lt=expense.date,
+    ).exclude(id=expense.id).exists()
+
+
+def detect_expense_anomalies(expense, base_queryset, *, amount_multiplier, minimum_baseline_count, duplicate_window_days):
+    reasons = []
+    score = 0
+
+    category_stats = category_baseline(base_queryset, expense, minimum_baseline_count)
+    if category_stats:
+        average = Decimal(str(category_stats['avg']))
+        ratio = expense.amount / average if average > 0 else Decimal('0')
+        if ratio >= amount_multiplier:
+            score += min(45, int(float(ratio) * 10))
+            reasons.append({
+                'code': 'HIGH_CATEGORY_AMOUNT',
+                'message': 'Amount is unusually high for this category.',
+                'baseline_average': money(average),
+                'baseline_count': category_stats['count'],
+                'ratio': round(float(ratio), 2),
+            })
+
+    vendor_stats = vendor_baseline(base_queryset, expense, minimum_baseline_count)
+    if vendor_stats:
+        average = Decimal(str(vendor_stats['avg']))
+        ratio = expense.amount / average if average > 0 else Decimal('0')
+        if ratio >= amount_multiplier:
+            score += min(35, int(float(ratio) * 8))
+            reasons.append({
+                'code': 'HIGH_VENDOR_AMOUNT',
+                'message': 'Amount is unusually high for this vendor.',
+                'baseline_average': money(average),
+                'baseline_count': vendor_stats['count'],
+                'ratio': round(float(ratio), 2),
+            })
+
+    duplicates = duplicate_candidates(base_queryset, expense, duplicate_window_days)
+    if duplicates:
+        score += 35
+        reasons.append({
+            'code': 'DUPLICATE_CANDIDATE',
+            'message': 'Similar expense exists near the same date.',
+            'matching_expense_ids': [candidate.id for candidate in duplicates],
+        })
+
+    if is_new_vendor(base_queryset, expense):
+        score += 15
+        reasons.append({
+            'code': 'NEW_VENDOR',
+            'message': 'Vendor has no prior spend history in this scope.',
+        })
+
+    if expense.date.weekday() >= 5:
+        score += 10
+        reasons.append({
+            'code': 'WEEKEND_EXPENSE',
+            'message': 'Expense date falls on a weekend.',
+        })
+
+    if not reasons:
+        return None
+
+    score = min(score, 100)
+    return {
+        **build_expense_snapshot(expense),
+        'score': score,
+        'severity': severity_from_score(score),
+        'reasons': reasons,
+    }
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def spending_trends(request):
+    period = request.query_params.get('period', 'daily')
+    if period not in PERIOD_TRUNCATORS:
+        raise ValidationError({'period': 'Use daily, weekly, or monthly.'})
+
+    expenses, member = scoped_expenses(request)
+    expenses, start_date, end_date = apply_date_filters(expenses, request)
+    trunc_func = PERIOD_TRUNCATORS[period]
+
+    rows = expenses.annotate(period_bucket=trunc_func('date')).values('period_bucket').annotate(
+        total=Sum('amount'),
+        count=Count('id'),
+    ).order_by('period_bucket')
+
+    trends = [
+        {
+            'period': row['period_bucket'],
+            'period_start': row['period_bucket'],
+            'total': money(row['total']),
+            'count': row['count'],
+        }
+        for row in rows
+    ]
+
+    return Response({
+        'organization_id': member.organization_id,
+        'scope': 'organization' if member.role == 'OWNER' else 'personal',
+        'period': period,
+        'start_date': start_date,
+        'end_date': end_date,
+        'trends': trends,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def category_breakdown(request):
+    expenses, member = scoped_expenses(request)
+    expenses, start_date, end_date = apply_date_filters(expenses, request)
+    total_amount = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+    rows = expenses.values('category').annotate(
+        total=Sum('amount'),
+        count=Count('id'),
+    ).order_by('-total')
+
+    breakdown = [
+        {
+            'category': row['category'],
+            'total': money(row['total']),
+            'count': row['count'],
+            'percentage': percent(row['total'], total_amount),
+        }
+        for row in rows
+    ]
+
+    return Response({
+        'organization_id': member.organization_id,
+        'scope': 'organization' if member.role == 'OWNER' else 'personal',
+        'start_date': start_date,
+        'end_date': end_date,
+        'breakdown': breakdown,
+        'total_amount': money(total_amount),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def period_comparison(request):
+    period_type = request.query_params.get('period_type', 'month')
+    if period_type not in PERIOD_TYPES:
+        raise ValidationError({'period_type': 'Use day, week, month, or year.'})
+
+    base_expenses, member = scoped_expenses(request)
+    current_start, current_end, previous_start, previous_end = current_and_previous_period(period_type)
+    current_summary = summarize_queryset(base_expenses.filter(date__gte=current_start, date__lte=current_end))
+    previous_summary = summarize_queryset(base_expenses.filter(date__gte=previous_start, date__lte=previous_end))
+
+    previous_total = Decimal(str(previous_summary['total']))
+    current_total = Decimal(str(current_summary['total']))
+    if previous_total > 0:
+        change_percentage = round(float(((current_total - previous_total) / previous_total) * Decimal('100')), 2)
     else:
         change_percentage = 0 if current_total == 0 else 100
-    
+
     return Response({
+        'organization_id': member.organization_id,
+        'scope': 'organization' if member.role == 'OWNER' else 'personal',
         'period_type': period_type,
         'current_period': {
             'start': current_start,
             'end': current_end,
-            'total': current_total,
-            'count': current_count
+            **current_summary,
         },
         'previous_period': {
             'start': previous_start,
             'end': previous_end,
-            'total': previous_total,
-            'count': previous_count
+            **previous_summary,
         },
-        'change_percentage': change_percentage
+        'change_percentage': change_percentage,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def vendor_summary(request):
+    expenses, member = scoped_expenses(request)
+    expenses, start_date, end_date = apply_date_filters(expenses, request)
+    limit = parse_limit(request)
+
+    rows = expenses.exclude(vendor__isnull=True).exclude(vendor='').values('vendor').annotate(
+        total=Sum('amount'),
+        count=Count('id'),
+    ).order_by('-total')[:limit]
+
+    vendors = [
+        {
+            'vendor': row['vendor'],
+            'total': money(row['total']),
+            'count': row['count'],
+        }
+        for row in rows
+    ]
+
+    return Response({
+        'organization_id': member.organization_id,
+        'scope': 'organization' if member.role == 'OWNER' else 'personal',
+        'start_date': start_date,
+        'end_date': end_date,
+        'vendors': vendors,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def budget_burn_rate(request):
+    member = get_member_or_error(request)
+    today = timezone.now().date()
+    budgets = Budget.objects.filter(
+        organization=member.organization,
+        is_active=True,
+    ).order_by('category', 'name')
+
+    rows = []
+    for budget in budgets:
+        start, end = budget_bounds(budget)
+        expense_filter = {
+            'organization': member.organization,
+            'status': 'APPROVED',
+            'date__gte': start,
+            'date__lte': end,
+        }
+        if budget.category != 'ALL':
+            expense_filter['category'] = budget.category
+        spent = Expense.objects.filter(**expense_filter).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        days_total = max((end - start).days + 1, 1)
+        elapsed_end = min(max(today, start), end)
+        days_elapsed = max((elapsed_end - start).days + 1, 1)
+        daily_burn = spent / Decimal(days_elapsed)
+        projected_spend = daily_burn * Decimal(days_total)
+
+        rows.append({
+            'budget_id': budget.id,
+            'name': budget.name,
+            'category': budget.category,
+            'period': budget.period,
+            'start_date': start,
+            'end_date': end,
+            'budget_amount': money(budget.amount),
+            'spent_amount': money(spent),
+            'remaining_amount': money(budget.amount - spent),
+            'percentage_used': percent(spent, budget.amount, precision=1),
+            'days_elapsed': days_elapsed,
+            'days_total': days_total,
+            'elapsed_percentage': round((days_elapsed / days_total) * 100, 1),
+            'daily_burn_rate': money(daily_burn),
+            'projected_spend': money(projected_spend),
+            'projected_percentage_used': percent(projected_spend, budget.amount, precision=1),
+            'is_over_budget': spent > budget.amount,
+            'is_projected_over_budget': projected_spend > budget.amount,
+        })
+
+    return Response({
+        'organization_id': member.organization_id,
+        'budgets': rows,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def overview(request):
+    expenses, member = scoped_expenses(request)
+    expenses, start_date, end_date = apply_date_filters(expenses, request)
+    summary = summarize_queryset(expenses)
+    category_count = expenses.values('category').distinct().count()
+    vendor_count = expenses.exclude(vendor__isnull=True).exclude(vendor='').values('vendor').distinct().count()
+
+    return Response({
+        'organization_id': member.organization_id,
+        'scope': 'organization' if member.role == 'OWNER' else 'personal',
+        'start_date': start_date,
+        'end_date': end_date,
+        'total_spent': summary['total'],
+        'transaction_count': summary['count'],
+        'category_count': category_count,
+        'vendor_count': vendor_count,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def ai_insights(request):
+    snapshot = build_ai_insight_snapshot(request)
+    generated_by_ai = True
+    try:
+        insight = generate_ai_insight(snapshot)
+    except AIInsightError:
+        generated_by_ai = False
+        insight = fallback_ai_insight(snapshot)
+
+    return Response({
+        'organization_id': snapshot['organization_id'],
+        'scope': snapshot['scope'],
+        'period': snapshot['period'],
+        'generated_by_ai': generated_by_ai,
+        'summary': insight['summary'],
+        'highlights': insight['highlights'],
+        'risks': insight['risks'],
+        'recommendations': insight['recommendations'],
+        'provider': insight['provider'],
+        'model': insight['model'],
+        'snapshot_metrics': {
+            'current_period': snapshot['current_period'],
+            'previous_period': snapshot['previous_period'],
+            'change_percentage': snapshot['change_percentage'],
+            'budget_risk_count': len(snapshot['budget_risks']),
+            'anomaly_count': len(snapshot['anomalies']),
+        },
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def anomalies(request):
+    expenses, member = scoped_anomaly_expenses(request)
+    lookback_days = parse_positive_int(request, 'lookback_days', default=180, maximum=730)
+    limit = parse_limit(request, default=20, maximum=100)
+    minimum_baseline_count = parse_positive_int(request, 'minimum_baseline_count', default=3, maximum=50)
+    duplicate_window_days = parse_positive_int(request, 'duplicate_window_days', default=3, maximum=30)
+
+    raw_multiplier = request.query_params.get('amount_multiplier', 2.5)
+    try:
+        amount_multiplier = Decimal(str(raw_multiplier))
+    except Exception as exc:
+        raise ValidationError({'amount_multiplier': 'Use a positive number.'}) from exc
+    if amount_multiplier <= 1:
+        raise ValidationError({'amount_multiplier': 'Use a number greater than 1.'})
+
+    today = timezone.now().date()
+    cutoff = today - timedelta(days=lookback_days)
+    base_queryset = expenses.filter(date__gte=cutoff, date__lte=today)
+    candidates = base_queryset.order_by('-date', '-created_at')[:limit * 3]
+
+    flagged = []
+    for expense in candidates:
+        anomaly = detect_expense_anomalies(
+            expense,
+            base_queryset,
+            amount_multiplier=amount_multiplier,
+            minimum_baseline_count=minimum_baseline_count,
+            duplicate_window_days=duplicate_window_days,
+        )
+        if anomaly:
+            flagged.append(anomaly)
+
+    flagged.sort(key=lambda item: (item['score'], item['date'], item['expense_id']), reverse=True)
+
+    return Response({
+        'organization_id': member.organization_id,
+        'scope': 'organization' if member.role == 'OWNER' else 'personal',
+        'lookback_days': lookback_days,
+        'rules': [
+            'HIGH_CATEGORY_AMOUNT',
+            'HIGH_VENDOR_AMOUNT',
+            'DUPLICATE_CANDIDATE',
+            'NEW_VENDOR',
+            'WEEKEND_EXPENSE',
+        ],
+        'total_flagged': len(flagged),
+        'anomalies': flagged[:limit],
     })

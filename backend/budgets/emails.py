@@ -1,8 +1,22 @@
 """
 Email utilities for budget alerts
 """
+import logging
+
 from django.core.mail import send_mail
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
+
+
+def _format_budget_period(budget, date_format):
+    if budget.start_date and budget.end_date:
+        return f"{budget.start_date.strftime(date_format)} to {budget.end_date.strftime(date_format)}"
+    if budget.start_date:
+        return f"From {budget.start_date.strftime(date_format)}"
+    if budget.end_date:
+        return f"Until {budget.end_date.strftime(date_format)}"
+    return budget.get_period_display()
 
 
 def send_budget_alert_email(budget, current_spending, recipients):
@@ -20,6 +34,8 @@ def send_budget_alert_email(budget, current_spending, recipients):
     
     percentage = (current_spending / budget_amount) * 100 if budget_amount > 0 else 0
     over_budget = current_spending - budget_amount
+    plain_period = _format_budget_period(budget, '%B %d, %Y')
+    html_period = _format_budget_period(budget, '%b %d, %Y')
     
     # Email subject
     subject = f"⚠️ Budget Alert: {budget.category} budget exceeded"
@@ -37,7 +53,7 @@ Budget Details:
 - Over Budget: {over_budget}
 - Percentage Used: {percentage:.1f}%
 
-Period: {budget.start_date.strftime('%B %d, %Y')} to {budget.end_date.strftime('%B %d, %Y')}
+Period: {plain_period}
 
 Please review your expenses and take necessary action.
 
@@ -100,7 +116,7 @@ Expense Management System
                     </div>
                     <div class="stat-row">
                         <span class="stat-label">Period</span>
-                        <span class="stat-value">{budget.start_date.strftime('%b %d, %Y')} - {budget.end_date.strftime('%b %d, %Y')}</span>
+                        <span class="stat-value">{html_period}</span>
                     </div>
                 </div>
                 
@@ -129,5 +145,8 @@ Expense Management System
         )
         return True
     except Exception as e:
-        print(f"Failed to send budget alert email: {e}")
+        logger.exception(
+            'Failed to send budget alert email',
+            extra={'budget_id': budget.id, 'organization_id': budget.organization_id},
+        )
         return False

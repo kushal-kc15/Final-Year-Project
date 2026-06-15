@@ -59,6 +59,10 @@ class Budget(models.Model):
     class Meta:
         db_table = 'budgets'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['organization', 'is_active', 'category'], name='bud_org_act_cat_idx'),
+            models.Index(fields=['organization', 'is_active', 'start_date', 'end_date'], name='bud_org_act_dates_idx'),
+        ]
     
     def __str__(self):
         return f"{self.name} - रू {self.amount} ({self.period})"
@@ -88,6 +92,10 @@ class BudgetAlert(models.Model):
     class Meta:
         db_table = 'budget_alerts'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['budget', 'alert_type'], name='bud_alert_type_idx'),
+            models.Index(fields=['is_read', '-created_at'], name='bud_alert_read_dt_idx'),
+        ]
     
     def __str__(self):
         return f"{self.budget.name} - {self.alert_type}"

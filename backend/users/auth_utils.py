@@ -1,12 +1,20 @@
 """
 Authentication utility functions
 """
+import hashlib
+import logging
 import secrets
 import string
 from datetime import timedelta
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
+
+
+class EmailDeliveryError(RuntimeError):
+    """Raised when a required authentication email cannot be delivered."""
 
 
 def generate_otp(length=6):
@@ -19,7 +27,51 @@ def generate_token(length=32):
     return secrets.token_urlsafe(length)
 
 
-def send_verification_email(user, token):
+def hash_token(token):
+    """Hash a user-facing secret before storing it."""
+    return hashlib.sha256(str(token).encode('utf-8')).hexdigest()
+
+
+def issue_refresh_token(user, lifetime=None):
+    """Issue a refresh token and keep blacklist metadata aligned with its expiry."""
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    refresh = RefreshToken.for_user(user)
+
+    if lifetime:
+        refresh.set_exp(lifetime=lifetime)
+        try:
+            from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+            from rest_framework_simplejwt.utils import datetime_from_epoch
+
+            OutstandingToken.objects.filter(jti=refresh['jti']).update(
+                expires_at=datetime_from_epoch(refresh['exp'])
+            )
+        except Exception:
+            pass
+
+    return refresh
+
+
+def blacklist_user_refresh_tokens(user):
+    """Blacklist all outstanding refresh tokens for a user."""
+    try:
+        from rest_framework_simplejwt.token_blacklist.models import (
+            BlacklistedToken,
+            OutstandingToken,
+        )
+    except Exception:
+        return 0
+
+    blacklisted_count = 0
+    for token in OutstandingToken.objects.filter(user=user):
+        _, created = BlacklistedToken.objects.get_or_create(token=token)
+        if created:
+            blacklisted_count += 1
+    return blacklisted_count
+
+
+def send_verification_email(user, token, raise_on_failure=False):
     """Send email verification link to user"""
     verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
     
@@ -87,7 +139,7 @@ Expense Management System
     """
     
     try:
-        send_mail(
+        sent_count = send_mail(
             subject=subject,
             message=message,
             from_email=settings.DEFAULT_FROM_EMAIL,
@@ -95,9 +147,13 @@ Expense Management System
             html_message=html_message,
             fail_silently=False,
         )
+        if sent_count < 1:
+            raise EmailDeliveryError('Verification email was not accepted by the email backend.')
         return True
     except Exception as e:
-        print(f"Failed to send verification email: {e}")
+        if raise_on_failure:
+            raise EmailDeliveryError('Unable to send verification email. Please try again.') from e
+        logger.exception('Failed to send verification email', extra={'user_id': user.id})
         return False
 
 
@@ -179,7 +235,7 @@ Expense Management System
         )
         return True
     except Exception as e:
-        print(f"Failed to send password reset email: {e}")
+        logger.exception('Failed to send password reset email', extra={'user_id': user.id})
         return False
 
 
@@ -249,7 +305,7 @@ Expense Management System
         )
         return True
     except Exception as e:
-        print(f"Failed to send 2FA OTP email: {e}")
+        logger.exception('Failed to send 2FA OTP email', extra={'user_id': user.id})
         return False
 
 

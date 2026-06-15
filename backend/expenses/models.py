@@ -58,6 +58,12 @@ class Expense(models.Model):
     class Meta:
         db_table = 'expenses'
         ordering = ['-date', '-created_at']
+        indexes = [
+            models.Index(fields=['organization', 'status', 'date'], name='exp_org_stat_dt_idx'),
+            models.Index(fields=['user', 'organization', 'status', 'date'], name='exp_user_org_st_dt_idx'),
+            models.Index(fields=['organization', 'category', 'status', 'date'], name='exp_org_cat_st_dt_idx'),
+            models.Index(fields=['organization', 'vendor'], name='exp_org_vendor_idx'),
+        ]
     
     def __str__(self):
         return f"{self.title} - रू {self.amount}"

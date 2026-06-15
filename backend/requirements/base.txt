@@ -20,8 +20,7 @@ python-dateutil==2.8.2
 
 # OCR and Image Processing
 Pillow==10.2.0
-
-# Google Gemini API (for OCR - FREE!)
-# Note: Using old package as it's more stable for our use case
-# The new google-genai package has API compatibility issues
-google-generativeai==0.8.6
+requests==2.31.0
+# Background processing
+celery==5.3.6
+redis==5.0.1

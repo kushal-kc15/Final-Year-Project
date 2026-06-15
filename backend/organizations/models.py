@@ -9,6 +9,15 @@ class Organization(models.Model):
     """
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    legal_name = models.CharField(max_length=255, blank=True)
+    industry = models.CharField(max_length=100, blank=True)
+    registration_number = models.CharField(max_length=100, blank=True)
+    tax_id = models.CharField(max_length=100, blank=True)
+    contact_email = models.EmailField(blank=True)
+    phone_number = models.CharField(max_length=20, blank=True)
+    address = models.TextField(blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, blank=True, default='Nepal')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -20,9 +29,12 @@ class Organization(models.Model):
         return self.name
 
 
-class OrganizationMember(models.Model):
+class Membership(models.Model):
     """
-    Membership model linking users to organizations with roles.
+    Membership model linking one user to one organization for the MVP.
+
+    The single-user uniqueness constraint can be relaxed later for full
+    multi-tenancy without changing the rest of the relationship shape.
     """
     ROLE_CHOICES = [
         ('OWNER', 'Owner'),
@@ -44,11 +56,18 @@ class OrganizationMember(models.Model):
     
     class Meta:
         db_table = 'organization_members'
-        unique_together = ['organization', 'user']
+        unique_together = (('user',),)
         ordering = ['-joined_at']
+        indexes = [
+            models.Index(fields=['organization', 'role'], name='mem_org_role_idx'),
+        ]
     
     def __str__(self):
         return f"{self.user.username} - {self.organization.name} ({self.role})"
+
+
+# Backwards-compatible import name for the existing API/view layer.
+OrganizationMember = Membership
 
 
 class Invitation(models.Model):
@@ -77,6 +96,7 @@ class Invitation(models.Model):
         choices=STATUS_CHOICES,
         default='PENDING'
     )
+    is_used = models.BooleanField(default=False)
     invited_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -88,6 +108,10 @@ class Invitation(models.Model):
     class Meta:
         db_table = 'invitations'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['email', 'status', 'is_used', 'expires_at'], name='inv_email_status_idx'),
+            models.Index(fields=['organization', 'status', 'is_used'], name='inv_org_status_idx'),
+        ]
     
     def __str__(self):
         return f"Invitation to {self.email} for {self.organization.name}"

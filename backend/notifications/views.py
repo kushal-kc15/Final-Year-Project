@@ -17,7 +17,9 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     
     def get_queryset(self):
         """Return notifications for the current user"""
-        return Notification.objects.filter(user=self.request.user)
+        return Notification.objects.filter(
+            user=self.request.user
+        ).select_related('user', 'organization')
     
     @action(detail=False, methods=['get'])
     def unread_count(self, request):

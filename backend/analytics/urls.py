@@ -2,7 +2,12 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('overview/', views.overview, name='analytics-overview'),
     path('spending-trends/', views.spending_trends, name='spending-trends'),
     path('category-breakdown/', views.category_breakdown, name='category-breakdown'),
     path('period-comparison/', views.period_comparison, name='period-comparison'),
+    path('vendor-summary/', views.vendor_summary, name='vendor-summary'),
+    path('budget-burn-rate/', views.budget_burn_rate, name='budget-burn-rate'),
+    path('ai-insights/', views.ai_insights, name='analytics-ai-insights'),
+    path('anomalies/', views.anomalies, name='analytics-anomalies'),
 ]

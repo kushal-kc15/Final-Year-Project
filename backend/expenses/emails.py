@@ -1,8 +1,12 @@
 """
 Email utilities for expense notifications
 """
+import logging
+
 from django.core.mail import send_mail
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 def send_expense_rejection_email(expense, rejected_by, reason=''):
@@ -17,7 +21,7 @@ def send_expense_rejection_email(expense, rejected_by, reason=''):
     recipient_email = expense.user.email
     
     if not recipient_email:
-        print(f"No email address for user {expense.user.username}")
+        logger.warning('Cannot send expense rejection email without recipient address', extra={'user_id': expense.user_id})
         return False
     
     # Email subject
@@ -140,7 +144,7 @@ Expense Management System
         )
         return True
     except Exception as e:
-        print(f"Failed to send expense rejection email: {e}")
+        logger.exception('Failed to send expense rejection email', extra={'expense_id': expense.id})
         return False
 
 
@@ -155,7 +159,7 @@ def send_expense_approval_email(expense, approved_by):
     recipient_email = expense.user.email
     
     if not recipient_email:
-        print(f"No email address for user {expense.user.username}")
+        logger.warning('Cannot send expense approval email without recipient address', extra={'user_id': expense.user_id})
         return False
     
     # Email subject
@@ -261,5 +265,5 @@ Expense Management System
         )
         return True
     except Exception as e:
-        print(f"Failed to send expense approval email: {e}")
+        logger.exception('Failed to send expense approval email', extra={'expense_id': expense.id})
         return False

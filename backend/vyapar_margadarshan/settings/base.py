@@ -1,16 +1,79 @@
 """
 Base settings for vyapar_margadarshan project.
 """
+from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse
+
+from django.core.exceptions import ImproperlyConfigured
 from decouple import config
+from corsheaders.defaults import default_headers
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-dev-key-change-in-production')
+INSECURE_SECRET_KEY = 'django-insecure-dev-key-change-in-production'
 
-DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+def config_bool(name, default=False):
+    """
+    Read a boolean env value with a few deployment-friendly aliases.
+    Keeps invalid values from crashing imports before settings can override them.
+    """
+    value = config(name, default=default)
+    if isinstance(value, bool):
+        return value
+
+    normalized = str(value).strip().lower()
+    if normalized in {'1', 'true', 't', 'yes', 'y', 'on', 'dev', 'development'}:
+        return True
+    if normalized in {'0', 'false', 'f', 'no', 'n', 'off', 'prod', 'production', 'release'}:
+        return False
+
+    raise ImproperlyConfigured(f'{name} must be a boolean-like value, got {value!r}.')
+
+
+def config_list(name, default=''):
+    """Read a comma-separated env value into a cleaned list."""
+    value = config(name, default=default)
+    return [item.strip() for item in str(value).split(',') if item.strip()]
+
+
+def database_config_from_url(database_url):
+    """Small DATABASE_URL parser to avoid hard-coding SQLite in production."""
+    parsed = urlparse(database_url)
+
+    if parsed.scheme in {'sqlite', 'sqlite3'}:
+        if parsed.path in {'', '/'}:
+            name = BASE_DIR / 'db.sqlite3'
+        elif parsed.netloc:
+            name = f'//{parsed.netloc}{parsed.path}'
+        else:
+            name = parsed.path.lstrip('/') if parsed.path.startswith('/') else parsed.path
+        return {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': name,
+        }
+
+    if parsed.scheme in {'postgres', 'postgresql'}:
+        return {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': parsed.path.lstrip('/'),
+            'USER': parsed.username or '',
+            'PASSWORD': parsed.password or '',
+            'HOST': parsed.hostname or '',
+            'PORT': parsed.port or '',
+        }
+
+    raise ImproperlyConfigured(
+        'DATABASE_URL must start with sqlite:/// or postgres:// / postgresql://.'
+    )
+
+
+SECRET_KEY = config('SECRET_KEY', default=INSECURE_SECRET_KEY)
+
+DEBUG = config_bool('DEBUG', default=True)
+
+ALLOWED_HOSTS = config_list('ALLOWED_HOSTS', default='localhost,127.0.0.1')
 
 # Application definition
 INSTALLED_APPS = [
@@ -24,6 +87,7 @@ INSTALLED_APPS = [
     # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
     
@@ -72,12 +136,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'vyapar_margadarshan.wsgi.application'
 
-# Database - SQLite for development
+# Database
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': database_config_from_url(config('DATABASE_URL', default='sqlite:///db.sqlite3'))
 }
 
 # Password validation
@@ -101,6 +162,12 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Media files
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+RECEIPT_MAX_UPLOAD_SIZE_MB = config('RECEIPT_MAX_UPLOAD_SIZE_MB', default=5, cast=int)
+RECEIPT_MAX_UPLOAD_SIZE_BYTES = RECEIPT_MAX_UPLOAD_SIZE_MB * 1024 * 1024
+RECEIPT_ALLOWED_CONTENT_TYPES = config_list(
+    'RECEIPT_ALLOWED_CONTENT_TYPES',
+    default='image/jpeg,image/png,image/webp,image/gif',
+)
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -113,18 +180,54 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'EXCEPTION_HANDLER': 'vyapar_margadarshan.api_exceptions.api_exception_handler',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_THROTTLE_RATES': {
+        'auth_register': config('THROTTLE_AUTH_REGISTER', default='5/hour'),
+        'auth_login': config('THROTTLE_AUTH_LOGIN', default='5/minute'),
+        'auth_google': config('THROTTLE_AUTH_GOOGLE', default='10/minute'),
+        'auth_refresh': config('THROTTLE_AUTH_REFRESH', default='20/minute'),
+        'auth_resend_verification': config('THROTTLE_AUTH_RESEND_VERIFICATION', default='3/hour'),
+        'auth_verify_email': config('THROTTLE_AUTH_VERIFY_EMAIL', default='10/minute'),
+        'auth_password_reset': config('THROTTLE_AUTH_PASSWORD_RESET', default='5/hour'),
+        'auth_password_reset_confirm': config('THROTTLE_AUTH_PASSWORD_RESET_CONFIRM', default='10/hour'),
+        'auth_password_strength': config('THROTTLE_AUTH_PASSWORD_STRENGTH', default='30/minute'),
+        'auth_otp_send': config('THROTTLE_AUTH_OTP_SEND', default='5/minute'),
+        'auth_otp_verify': config('THROTTLE_AUTH_OTP_VERIFY', default='10/minute'),
+        'auth_security_user': config('THROTTLE_AUTH_SECURITY_USER', default='10/minute'),
+    },
+}
+
+# JWT settings
+JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME = timedelta(
+    minutes=config('JWT_REMEMBER_ME_REFRESH_TOKEN_LIFETIME', default=43200, cast=int)
+)
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(
+        minutes=config('JWT_ACCESS_TOKEN_LIFETIME', default=15, cast=int)
+    ),
+    'REFRESH_TOKEN_LIFETIME': timedelta(
+        minutes=config('JWT_REFRESH_TOKEN_LIFETIME', default=10080, cast=int)
+    ),
+    'ROTATE_REFRESH_TOKENS': config_bool('JWT_ROTATE_REFRESH_TOKENS', default=True),
+    'BLACKLIST_AFTER_ROTATION': config_bool('JWT_BLACKLIST_AFTER_ROTATION', default=True),
+    'UPDATE_LAST_LOGIN': config_bool('JWT_UPDATE_LAST_LOGIN', default=True),
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'SIGNING_KEY': config('JWT_SIGNING_KEY', default=SECRET_KEY),
+    'LEEWAY': config('JWT_LEEWAY_SECONDS', default=0, cast=int),
 }
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5174',
+CORS_ALLOWED_ORIGINS = config_list(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174',
+)
+CORS_ALLOW_CREDENTIALS = config_bool('CORS_ALLOW_CREDENTIALS', default=False)
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'x-organization-id',
 ]
-CORS_ALLOW_CREDENTIALS = True
 
 # Email settings
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
@@ -137,3 +240,14 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@vyaparmargada
 
 # Frontend URL (for email links)
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+
+# Celery background jobs
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/1')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_ALWAYS_EAGER = config_bool('CELERY_TASK_ALWAYS_EAGER', default=False)
+CELERY_TASK_EAGER_PROPAGATES = config_bool('CELERY_TASK_EAGER_PROPAGATES', default=DEBUG)
+OCR_QUEUE_FALLBACK_SYNC = config_bool('OCR_QUEUE_FALLBACK_SYNC', default=DEBUG)

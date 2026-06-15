@@ -12,6 +12,9 @@ class OrganizationSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_member_count(self, obj):
+        annotated_count = getattr(obj, 'member_count_value', None)
+        if annotated_count is not None:
+            return annotated_count
         return obj.members.count()
 
 
@@ -33,7 +36,7 @@ class InvitationSerializer(serializers.ModelSerializer):
         model = Invitation
         fields = [
             'id', 'organization', 'organization_name', 'email', 'role',
-            'token', 'status', 'invited_by', 'invited_by_name',
+            'token', 'status', 'is_used', 'invited_by', 'invited_by_name',
             'created_at', 'expires_at'
         ]
-        read_only_fields = ['id', 'token', 'status', 'invited_by', 'created_at']
+        read_only_fields = ['id', 'token', 'status', 'is_used', 'invited_by', 'created_at']
