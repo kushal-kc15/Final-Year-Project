@@ -166,7 +166,7 @@ RECEIPT_MAX_UPLOAD_SIZE_MB = config('RECEIPT_MAX_UPLOAD_SIZE_MB', default=5, cas
 RECEIPT_MAX_UPLOAD_SIZE_BYTES = RECEIPT_MAX_UPLOAD_SIZE_MB * 1024 * 1024
 RECEIPT_ALLOWED_CONTENT_TYPES = config_list(
     'RECEIPT_ALLOWED_CONTENT_TYPES',
-    default='image/jpeg,image/png,image/webp,image/gif',
+    default='image/jpeg,image/png,image/webp',
 )
 
 # Default primary key field type
@@ -240,6 +240,10 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@vyaparmargada
 
 # Frontend URL (for email links)
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+
+# Temporarily disable login-time 2FA challenges while the app is being finalized.
+# Existing user 2FA preferences are preserved and can be enforced again by setting this true.
+TWO_FACTOR_LOGIN_ENABLED = config_bool('TWO_FACTOR_LOGIN_ENABLED', default=False)
 
 # Celery background jobs
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')

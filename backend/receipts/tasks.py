@@ -37,8 +37,8 @@ def apply_ocr_result(receipt, extracted_data):
 
 def process_receipt_ocr_sync(receipt_id):
     receipt = Receipt.objects.select_related('organization', 'user').get(id=receipt_id)
-    if receipt.status == 'VERIFIED':
-        logger.info('Skipping OCR for verified receipt %s', receipt_id)
+    if receipt.status in {'COMPLETED', 'VERIFIED'}:
+        logger.info('Skipping OCR for already finalized receipt %s', receipt_id)
         return {'status': receipt.status, 'receipt_id': receipt_id}
 
     receipt.status = 'PROCESSING'

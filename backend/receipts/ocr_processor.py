@@ -1,12 +1,17 @@
 import base64
 import json
 import logging
+import re
 import time
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
 import requests
+from dateutil import parser as date_parser
+from dateutil.parser import ParserError
 from decouple import config
+from django.conf import settings
 from PIL import Image, UnidentifiedImageError
 
 logger = logging.getLogger(__name__)
@@ -26,48 +31,42 @@ IMAGE_MEDIA_TYPES = {
     'JPEG': 'image/jpeg',
     'PNG': 'image/png',
     'WEBP': 'image/webp',
-    'GIF': 'image/gif',
 }
 
-RECEIPT_EXTRACTION_PROMPT = """FIRST, determine if this image is actually a receipt, invoice, or bill. If it is NOT a receipt/invoice/bill, return this exact JSON:
+SUPPORTED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
+
+NVIDIA_DEFAULT_URL = 'https://integrate.api.nvidia.com/v1/chat/completions'
+NVIDIA_DEFAULT_MODEL = 'nvidia/nemotron-nano-12b-v2-vl'
+TRANSIENT_HTTP_STATUSES = {429, 500, 502, 503, 504}
+
+RECEIPT_EXTRACTION_PROMPT = """Extract receipt data from this image.
+
+Return only valid JSON. No markdown. No explanation.
 
 {
-    "is_receipt": false,
-    "vendor_name": "",
-    "total_amount": 0,
-    "receipt_date": "",
-    "category": "OTHER",
-    "description": "",
-    "line_items": [],
-    "raw_text": ""
-}
-
-If it IS a receipt/invoice/bill, extract this JSON:
-
-{
-    "is_receipt": true,
-    "vendor_name": "name of the store/vendor",
-    "total_amount": "total amount as a number, e.g. 1234.56",
-    "receipt_date": "date in YYYY-MM-DD format",
-    "category": "one of: FOOD, TRANSPORT, OFFICE, UTILITIES, SALARY, RENT, MARKETING, OTHER",
-    "description": "brief description of what this expense is for",
-    "line_items": [
-        {
-            "description": "item name",
-            "quantity": 1,
-            "unit_price": 0.00,
-            "amount": 0.00
-        }
-    ],
-    "raw_text": "all text from the receipt"
+  "vendor_name": "",
+  "total_amount": null,
+  "receipt_date": "",
+  "category": "",
+  "description": "",
+  "line_items": [
+    {
+      "name": "",
+      "quantity": null,
+      "unit_price": null,
+      "total": null
+    }
+  ],
+  "warnings": []
 }
 
 Rules:
-- A receipt/invoice/bill usually has vendor name, items/services, prices, total amount, and date.
-- If the image does not have those characteristics, set is_receipt to false.
-- Extract the final total amount, not subtotal.
-- If date is unclear, use today's date.
-- Return valid JSON only. Do not include markdown fences or commentary."""
+- Do not invent values.
+- If a field is not visible, use null or empty string.
+- Use YYYY-MM-DD for receipt_date when possible.
+- total_amount must be a number only.
+- category must be one of: FOOD, TRANSPORT, OFFICE, UTILITIES, SALARY, RENT, MARKETING, OTHER.
+- If unsure about category, use OTHER."""
 
 
 class OCRConfigurationError(RuntimeError):
@@ -90,13 +89,14 @@ class OCRProcessor:
         if self.provider == 'nvidia':
             self.api_key = config('NVIDIA_API_KEY', default='').strip()
             self.invoke_url = config(
-                'NVIDIA_OCR_INVOKE_URL',
-                default='https://integrate.api.nvidia.com/v1/chat/completions',
+                'NVIDIA_OCR_URL',
+                default=config('NVIDIA_OCR_INVOKE_URL', default=NVIDIA_DEFAULT_URL),
             ).strip()
-            self.model = config('NVIDIA_OCR_MODEL', default='moonshotai/kimi-k2.6')
+            self.model = config('NVIDIA_OCR_MODEL', default=NVIDIA_DEFAULT_MODEL)
             self.timeout = config('NVIDIA_OCR_TIMEOUT', default=120, cast=int)
             self.max_retries = config('NVIDIA_OCR_MAX_RETRIES', default=2, cast=int)
             self.retry_delay = config('NVIDIA_OCR_RETRY_DELAY', default=1, cast=int)
+            self._validate_nvidia_config()
         elif self.provider == 'freemodel':
             self.api_key = config('FREEMODEL_API_KEY', default='').strip()
             base_url = config('FREEMODEL_BASE_URL', default='https://api.freemodel.dev').rstrip('/')
@@ -112,18 +112,36 @@ class OCRProcessor:
             raise OCRConfigurationError(f'{self.provider.upper()} API key is not configured.')
 
     def process(self):
-        logger.info('Processing receipt with %s OCR model: %s', self.provider, self.model)
+        logger.info(
+            'Processing receipt with configured OCR provider',
+            extra={'provider': self.provider, 'model': self.model},
+        )
         raw_response = self._extract_with_provider()
         data = self._parse_json_response(raw_response)
         return self._normalize_receipt_data(data)
 
+    def _validate_nvidia_config(self):
+        if not self.api_key:
+            raise OCRConfigurationError('NVIDIA API key is not configured.')
+        if not self.invoke_url:
+            raise OCRConfigurationError('NVIDIA OCR URL is not configured.')
+        if not self.model:
+            raise OCRConfigurationError('NVIDIA OCR model is not configured.')
+        if self.timeout <= 0:
+            raise OCRConfigurationError('NVIDIA OCR timeout must be greater than 0.')
+        if self.max_retries < 1:
+            raise OCRConfigurationError('NVIDIA OCR max retries must be at least 1.')
+        if self.retry_delay < 0:
+            raise OCRConfigurationError('NVIDIA OCR retry delay cannot be negative.')
+
     def _extract_with_provider(self):
         media_type, image_data = self._read_image_for_api()
+        image_url = f'data:{media_type};base64,{image_data}'
+        del image_data
         payload = {
             'model': self.model,
-            'max_tokens': config('OCR_MAX_OUTPUT_TOKENS', default=1500, cast=int),
+            'max_tokens': config('OCR_MAX_OUTPUT_TOKENS', default=2048, cast=int),
             'temperature': 0,
-            'top_p': 1,
             'stream': False,
             'messages': [
                 {
@@ -136,7 +154,7 @@ class OCRProcessor:
                         {
                             'type': 'image_url',
                             'image_url': {
-                                'url': f'data:{media_type};base64,{image_data}',
+                                'url': image_url,
                             }
                         },
                     ],
@@ -158,50 +176,48 @@ class OCRProcessor:
                     json=payload,
                     timeout=self.timeout,
                 )
-                if response.status_code in {429, 500, 502, 503, 504} and attempt < self.max_retries - 1:
+                if response.status_code in TRANSIENT_HTTP_STATUSES and attempt < self.max_retries - 1:
                     self._sleep_before_retry(attempt, response.status_code)
                     continue
                 try:
                     response.raise_for_status()
                 except requests.HTTPError as exc:
-                    preview = self._response_preview(response)
                     logger.warning(
                         '%s OCR provider rejected request',
                         self.provider,
                         extra={
                             'status_code': response.status_code,
-                            'body_preview': preview,
                             'model': self.model,
                         },
                     )
                     raise OCRProviderError(
-                        f'{self.provider} OCR HTTP {response.status_code}: {preview}'
+                        f'{self.provider} OCR HTTP {response.status_code}.'
                     ) from exc
 
                 try:
                     response_payload = response.json()
                 except ValueError as exc:
-                    preview = self._response_preview(response)
                     logger.warning(
                         '%s OCR provider returned non-JSON HTTP response',
                         self.provider,
-                        extra={'status_code': response.status_code, 'body_preview': preview},
+                        extra={'status_code': response.status_code},
                     )
                     raise OCRProviderError(f'{self.provider} OCR returned non-JSON response.') from exc
 
                 return self._extract_text_from_response(response_payload)
             except OCRProviderError as exc:
                 last_error = exc
-                if attempt < self.max_retries - 1:
-                    self._sleep_before_retry(attempt, None)
-                    continue
                 logger.exception('%s OCR processing failed', self.provider)
                 break
-            except requests.RequestException as exc:
+            except requests.Timeout as exc:
                 last_error = exc
                 if attempt < self.max_retries - 1:
                     self._sleep_before_retry(attempt, None)
                     continue
+                logger.exception('%s OCR request timed out', self.provider)
+                break
+            except requests.RequestException as exc:
+                last_error = exc
                 logger.exception('%s OCR request failed', self.provider)
                 break
 
@@ -210,11 +226,20 @@ class OCRProcessor:
 
         raise OCRProviderError(f'{self.provider} OCR request failed.') from last_error
 
-    def _response_preview(self, response):
-        text = (response.text or '').replace(self.api_key, '[redacted]')
-        return text[:500]
-
     def _read_image_for_api(self):
+        image_path = Path(self.image_path)
+        extension = image_path.suffix.lower()
+        if extension and extension not in SUPPORTED_IMAGE_EXTENSIONS:
+            raise OCRProviderError('Unsupported receipt image format.')
+
+        max_size = getattr(settings, 'RECEIPT_MAX_UPLOAD_SIZE_BYTES', None)
+        try:
+            file_size = image_path.stat().st_size
+        except OSError as exc:
+            raise OCRProviderError('Receipt image could not be read.') from exc
+        if max_size and file_size > max_size:
+            raise OCRProviderError('Receipt image exceeds the maximum supported size.')
+
         try:
             with Image.open(self.image_path) as image:
                 image.verify()
@@ -251,17 +276,31 @@ class OCRProcessor:
 
     def _parse_json_response(self, raw_response):
         text = raw_response.strip()
-        if text.startswith('```'):
-            text = text.split('```')[1]
-            if text.startswith('json'):
-                text = text[4:]
-            text = text.strip()
+        fenced_match = re.fullmatch(r'```(?:json)?\s*(.*?)\s*```', text, re.DOTALL | re.IGNORECASE)
+        if fenced_match:
+            text = fenced_match.group(1).strip()
 
         try:
             return json.loads(text)
         except json.JSONDecodeError as exc:
+            extracted = self._extract_first_json_object(text)
+            if extracted is not None:
+                return extracted
             logger.warning('%s OCR returned non-JSON response', self.provider)
             raise OCRProviderError('OCR provider returned invalid JSON.') from exc
+
+    def _extract_first_json_object(self, text):
+        decoder = json.JSONDecoder()
+        for index, character in enumerate(text):
+            if character != '{':
+                continue
+            try:
+                parsed, _ = decoder.raw_decode(text[index:])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+        return None
 
     def _normalize_receipt_data(self, data):
         if not data.get('is_receipt', True):
@@ -285,10 +324,14 @@ class OCRProcessor:
             warnings.append('unsupported_category_normalized')
             category = 'OTHER'
 
-        line_items = data.get('line_items')
+        line_items = self._normalize_line_items(data.get('line_items'))
         if not isinstance(line_items, list):
             warnings.append('invalid_line_items')
             line_items = []
+
+        provider_warnings = data.get('warnings')
+        if isinstance(provider_warnings, list):
+            warnings.extend(str(warning) for warning in provider_warnings if warning)
 
         return {
             'raw_text': str(data.get('raw_text') or ''),
@@ -316,15 +359,41 @@ class OCRProcessor:
         return amount if amount > 0 else None
 
     def _parse_date(self, value):
-        today = datetime.now().date()
         if not value:
-            return today, 30, 'missing_receipt_date'
+            return None, 0, 'missing_receipt_date'
+        value = str(value).strip()
         try:
-            parsed_date = datetime.strptime(str(value), '%Y-%m-%d').date()
+            parsed_date = datetime.strptime(value, '%Y-%m-%d').date()
         except ValueError:
-            return today, 30, 'invalid_receipt_date'
+            try:
+                default = datetime(1900, 1, 1)
+                parsed_date = date_parser.parse(value, default=default).date()
+            except (ParserError, TypeError, ValueError, OverflowError):
+                return None, 0, 'invalid_receipt_date'
+            if parsed_date.year == 1900:
+                return None, 0, 'invalid_receipt_date'
 
+        if parsed_date.year < 1900:
+            return None, 0, 'invalid_receipt_date'
+
+        today = datetime.now().date()
         if parsed_date > today:
-            return today, 40, 'future_receipt_date_normalized'
+            return None, 0, 'future_receipt_date'
 
         return parsed_date, 90, None
+
+    def _normalize_line_items(self, line_items):
+        if not isinstance(line_items, list):
+            return line_items
+
+        normalized_items = []
+        for item in line_items:
+            if not isinstance(item, dict):
+                continue
+            normalized_items.append({
+                'name': str(item.get('name') or item.get('description') or '').strip(),
+                'quantity': item.get('quantity'),
+                'unit_price': item.get('unit_price'),
+                'total': item.get('total', item.get('amount')),
+            })
+        return normalized_items
