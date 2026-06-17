@@ -158,3 +158,53 @@ class OrganizationTestCase(TestCase):
         self.assertEqual(OrganizationMember.objects.filter(user=self.user).count(), 1)
         self.user.refresh_from_db()
         self.assertIsNone(self.user.active_organization)
+
+
+class OrganizationOwnerPermissionTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.owner = User.objects.create_user(
+            username='orgowner',
+            email='orgowner@example.com',
+            password='testpass123',
+        )
+        self.staff = User.objects.create_user(
+            username='orgstaff',
+            email='orgstaff@example.com',
+            password='testpass123',
+        )
+        self.organization = Organization.objects.create(name='Original Org')
+        OrganizationMember.objects.create(
+            organization=self.organization,
+            user=self.owner,
+            role='OWNER',
+        )
+        OrganizationMember.objects.create(
+            organization=self.organization,
+            user=self.staff,
+            role='STAFF',
+        )
+        self.staff.active_organization = self.organization
+        self.staff.save(update_fields=['active_organization'])
+        self.client.force_authenticate(user=self.staff)
+
+    def test_staff_cannot_update_organization(self):
+        response = self.client.patch(
+            f'/api/organizations/{self.organization.id}/',
+            {'name': 'Renamed Org'},
+            format='json',
+            HTTP_X_ORGANIZATION_ID=str(self.organization.id),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.organization.refresh_from_db()
+        self.assertEqual(self.organization.name, 'Original Org')
+
+    def test_staff_cannot_delete_organization(self):
+        response = self.client.delete(
+            f'/api/organizations/{self.organization.id}/',
+            HTTP_X_ORGANIZATION_ID=str(self.organization.id),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Organization.objects.filter(id=self.organization.id).exists())

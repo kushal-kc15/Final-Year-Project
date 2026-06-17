@@ -9,6 +9,8 @@ class IsOrganizationOwner(BasePermission):
     message = 'Only owners can perform this action.'
 
     def has_object_permission(self, request, view, obj):
+        if request.user and (request.user.is_staff or request.user.is_superuser):
+            return True
         if isinstance(obj, Organization):
             return OrganizationMember.objects.filter(
                 organization=obj,
@@ -24,6 +26,8 @@ class IsInvitationOwner(BasePermission):
     message = 'Only owners can manage this invitation.'
 
     def has_object_permission(self, request, view, obj):
+        if request.user and (request.user.is_staff or request.user.is_superuser):
+            return True
         if isinstance(obj, Invitation):
             return OrganizationMember.objects.filter(
                 organization=obj.organization,

@@ -216,7 +216,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             user.last_login_ip = get_client_ip(request)
             user.save()
 
-            if user.two_factor_enabled:
+            if settings.TWO_FACTOR_LOGIN_ENABLED and user.two_factor_enabled:
                 send_two_factor_challenge(user, request)
                 logger.info(f"2FA challenge sent for user: {user.username}")
                 return Response({
@@ -342,7 +342,7 @@ class GoogleLoginView(APIView):
             user.last_login_ip = get_client_ip(request)
             user.save()
 
-            if user.two_factor_enabled:
+            if settings.TWO_FACTOR_LOGIN_ENABLED and user.two_factor_enabled:
                 send_two_factor_challenge(user, request)
                 logger.info(f"2FA challenge sent for Google login user: {user.username}")
                 return Response(

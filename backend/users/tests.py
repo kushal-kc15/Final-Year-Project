@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -226,7 +226,25 @@ class TwoFactorAuthenticationTestCase(TestCase):
     def tearDown(self):
         cache.clear()
 
-    def test_login_requires_otp_before_issuing_tokens(self):
+    def test_login_bypasses_otp_while_login_2fa_is_disabled(self):
+        with patch('users.security_views.send_2fa_otp_email') as send_otp:
+            login_response = self.client.post(
+                '/api/auth/login/',
+                {
+                    'email': self.user.email,
+                    'password': 'StrongPass123!',
+                },
+                format='json',
+            )
+
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        self.assertNotIn('requires_2fa', login_response.data)
+        self.assertIn('access', login_response.data)
+        self.assertIn('refresh', login_response.data)
+        send_otp.assert_not_called()
+
+    @override_settings(TWO_FACTOR_LOGIN_ENABLED=True)
+    def test_login_requires_otp_before_issuing_tokens_when_enabled(self):
         sent_otps = []
 
         def capture_otp(user, otp):
@@ -293,7 +311,8 @@ class TwoFactorAuthenticationTestCase(TestCase):
         owner.refresh_from_db()
         self.assertFalse(owner.two_factor_enabled)
 
-    def test_google_login_requires_otp_for_2fa_enabled_existing_user(self):
+    @override_settings(TWO_FACTOR_LOGIN_ENABLED=True)
+    def test_google_login_requires_otp_for_2fa_enabled_existing_user_when_enabled(self):
         sent_otps = []
 
         def capture_otp(user, otp):

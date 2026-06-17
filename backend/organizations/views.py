@@ -26,7 +26,10 @@ User = get_user_model()
 class OrganizationViewSet(viewsets.ModelViewSet):
     serializer_class = OrganizationSerializer
     permission_classes = [IsAuthenticated]
-    owner_action_names = {'invite', 'update_member_role', 'remove_member', 'statistics'}
+    owner_action_names = {
+        'update', 'partial_update', 'destroy',
+        'invite', 'update_member_role', 'remove_member', 'statistics',
+    }
 
     def get_permissions(self):
         if self.action in self.owner_action_names:
@@ -34,6 +37,11 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
     
     def get_queryset(self):
+        if self.request.user.is_staff or self.request.user.is_superuser:
+            return Organization.objects.annotate(
+                member_count_value=Count('members', distinct=True)
+            ).distinct()
+
         # Return organizations where user is a member
         return Organization.objects.filter(
             members__user=self.request.user

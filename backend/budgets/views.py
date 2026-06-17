@@ -20,6 +20,9 @@ class BudgetViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Return budgets for user's organization"""
         user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return Budget.objects.all().select_related('organization', 'created_by')
+
         member = get_active_membership(user, self.request)
         if member:
             return Budget.objects.filter(organization=member.organization).select_related('organization', 'created_by')
@@ -55,6 +58,17 @@ class BudgetViewSet(viewsets.ModelViewSet):
         
         # Check if budget needs alert after update
         self.check_budget_alerts(serializer.instance)
+
+    def perform_destroy(self, instance):
+        """Delete budget."""
+        user = self.request.user
+        member = get_active_membership(user, self.request)
+
+        # Only OWNER can delete budgets
+        if not ((member and member.role == 'OWNER') or user.is_staff or user.is_superuser):
+            raise PermissionDenied('Only owners can delete budgets')
+
+        instance.delete()
     
     def check_budget_alerts(self, budget):
         """Check if budget has crossed threshold and create alerts"""
@@ -155,28 +169,53 @@ class BudgetViewSet(viewsets.ModelViewSet):
             'alerts_created': alerts_created
         })
     
+    def list(self, request, *args, **kwargs):
+        """
+        Override list to precompute spent_amount in bulk to avoid BudgetSerializer N+1 queries.
+
+        IMPORTANT: Preserve DRF pagination response shape exactly by using
+        paginate_queryset() + get_paginated_response().
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            page_list = list(page)
+            BudgetSerializer.precompute_spent_amounts(page_list)
+            serializer = self.get_serializer(page_list, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        budgets = list(queryset)
+        BudgetSerializer.precompute_spent_amounts(budgets)
+        serializer = self.get_serializer(budgets, many=True)
+        return Response(serializer.data)
+
     @action(detail=False, methods=['get'])
     def summary(self, request):
         """Get budget summary for dashboard"""
-        budgets = self.get_queryset().filter(is_active=True)
-        
-        total_budgets = budgets.count()
+        budgets_qs = self.get_queryset().filter(is_active=True)
+        budgets = list(budgets_qs)
+
+        total_budgets = budgets_qs.count()
         total_allocated = sum(float(b.amount) for b in budgets)
-        
+
+        BudgetSerializer.precompute_spent_amounts(budgets)
         serializer = self.get_serializer(budgets, many=True)
-        total_spent = sum(b['spent_amount'] for b in serializer.data)
-        
+        data = serializer.data
+
+        total_spent = sum(b['spent_amount'] for b in data)
+
         # Count budgets by status
-        at_risk = sum(1 for b in serializer.data if b['percentage_used'] >= 80 and b['percentage_used'] < 100)
-        exceeded = sum(1 for b in serializer.data if b['percentage_used'] >= 100)
-        
+        at_risk = sum(1 for b in data if b['percentage_used'] >= 80 and b['percentage_used'] < 100)
+        exceeded = sum(1 for b in data if b['percentage_used'] >= 100)
+
         return Response({
             'total_budgets': total_budgets,
             'total_allocated': total_allocated,
             'total_spent': total_spent,
             'at_risk_count': at_risk,
             'exceeded_count': exceeded,
-            'budgets': serializer.data
+            'budgets': data
         })
     
     @action(detail=False, methods=['get'])

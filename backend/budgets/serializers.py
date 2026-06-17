@@ -39,6 +39,64 @@ class BudgetSerializer(serializers.ModelSerializer):
             return today.replace(month=1, day=1), today.replace(month=12, day=31)
         return None, None
 
+    @classmethod
+    def precompute_spent_amounts(cls, budgets):
+        """
+        Bulk precompute spent_amount for budgets, writing results into
+        budget._spent_amount_cache to avoid per-budget Expense aggregates.
+
+        Must preserve the exact semantics of _get_spent_amount:
+        - organization_id
+        - status='APPROVED'
+        - date range derived from (start_date/end_date) or period fallback
+        - category filter applied only when budget.category != 'ALL'
+        """
+        from expenses.models import Expense
+
+        budgets = list(budgets)
+        if not budgets:
+            return
+
+        today = timezone.now().date()
+
+        def effective_period_range(budget):
+            start_date = budget.start_date
+            end_date = budget.end_date
+
+            # Match existing fallback behavior from _get_spent_amount
+            if not start_date or not end_date:
+                ps, pe = cls()._get_period_date_range(budget.period)
+                start_date = start_date or ps
+                end_date = end_date or pe or timezone.now().date()
+
+            # Final safety fallback consistent with _get_spent_amount
+            start_date = start_date or today
+            end_date = end_date or today
+            return start_date, end_date
+
+        groups = {}
+        for budget in budgets:
+            start_date, end_date = effective_period_range(budget)
+            category_key = None if budget.category == 'ALL' else budget.category
+            key = (budget.organization_id, start_date, end_date, category_key)
+            groups.setdefault(key, []).append(budget)
+
+        for (org_id, start_date, end_date, category_key), grouped_budgets in groups.items():
+            expenses_qs = Expense.objects.filter(
+                organization_id=org_id,
+                status='APPROVED',
+                date__gte=start_date,
+                date__lte=end_date,
+            )
+            if category_key is not None:
+                expenses_qs = expenses_qs.filter(category=category_key)
+
+            total = expenses_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            total_float = float(total)
+
+            for budget in grouped_budgets:
+                budget._spent_amount_cache = total_float
+
     def validate(self, attrs):
         period = attrs.get('period') or getattr(self.instance, 'period', None)
         has_start_date = 'start_date' in attrs

@@ -1,7 +1,12 @@
 from rest_framework import serializers
 from django.conf import settings
+from decouple import config
+from decimal import Decimal
 from PIL import Image, UnidentifiedImageError
 from .models import Receipt
+from expenses.models import Expense
+
+NVIDIA_ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
 
 
 class ReceiptSerializer(serializers.ModelSerializer):
@@ -39,7 +44,10 @@ class ReceiptUploadSerializer(serializers.ModelSerializer):
             )
 
         content_type = getattr(image, 'content_type', '')
-        if content_type not in settings.RECEIPT_ALLOWED_CONTENT_TYPES:
+        allowed_content_types = set(settings.RECEIPT_ALLOWED_CONTENT_TYPES)
+        if config('OCR_PROVIDER', default='nvidia').strip().lower() == 'nvidia':
+            allowed_content_types &= NVIDIA_ALLOWED_CONTENT_TYPES
+        if content_type not in allowed_content_types:
             raise serializers.ValidationError('Unsupported receipt image type.')
 
         try:
@@ -52,3 +60,12 @@ class ReceiptUploadSerializer(serializers.ModelSerializer):
             image.file.seek(0)
 
         return image
+
+
+class ReceiptVerifySerializer(serializers.Serializer):
+    vendor_name = serializers.CharField(max_length=255, allow_blank=True, required=False, allow_null=True)
+    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'), required=False)
+    receipt_date = serializers.DateField(required=False)
+    category = serializers.ChoiceField(choices=Expense.CATEGORY_CHOICES, required=False, allow_blank=True, allow_null=True)
+    description = serializers.CharField(allow_blank=True, required=False)
+    line_items = serializers.JSONField(required=False)

@@ -5,6 +5,7 @@ from rest_framework import status
 from datetime import date, timedelta
 from decimal import Decimal
 from .models import Expense
+from organizations.models import Organization, OrganizationMember
 
 User = get_user_model()
 
@@ -124,3 +125,46 @@ class ExpenseDashboardMetricsTestCase(TestCase):
         }
         response = self.client.post('/api/expenses/', data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ExpenseStatusPermissionTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.staff = User.objects.create_user(
+            username='staffuser',
+            email='staff@example.com',
+            password='testpass123',
+        )
+        self.organization = Organization.objects.create(name='Expense Org')
+        OrganizationMember.objects.create(
+            organization=self.organization,
+            user=self.staff,
+            role='STAFF',
+        )
+        self.staff.active_organization = self.organization
+        self.staff.save(update_fields=['active_organization'])
+        self.client.force_authenticate(user=self.staff)
+
+    def test_staff_cannot_patch_expense_status_directly(self):
+        expense = Expense.objects.create(
+            organization=self.organization,
+            user=self.staff,
+            title='Submitted receipt',
+            amount=Decimal('42.00'),
+            category='FOOD',
+            date=date.today(),
+            status='PENDING',
+        )
+
+        response = self.client.patch(
+            f'/api/expenses/{expense.id}/',
+            {'status': 'APPROVED', 'title': 'Updated receipt'},
+            format='json',
+            HTTP_X_ORGANIZATION_ID=str(self.organization.id),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expense.refresh_from_db()
+        self.assertEqual(expense.status, 'PENDING')
+        self.assertEqual(expense.title, 'Updated receipt')
+        self.assertEqual(response.data['status'], 'PENDING')
