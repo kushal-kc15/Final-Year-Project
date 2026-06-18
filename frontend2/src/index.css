@@ -1,0 +1,108 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv11', 'ss01';
+    @apply bg-paper text-ink;
+  }
+
+  ::selection {
+    background: #fbeeea;
+    color: #8a291a;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: #1c1a17;
+    text-wrap: balance;
+  }
+
+  .num,
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  :focus-visible {
+    outline: 2px solid #c2412a;
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbc3b1;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a39e95;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-lg border border-rule bg-paper shadow-xs;
+  }
+  .card-hover {
+    @apply transition-colors duration-150 hover:border-rule-strong hover:shadow-sm;
+  }
+
+  .eyebrow {
+    @apply text-micro font-semibold uppercase text-ink-muted;
+  }
+
+  .field {
+    @apply w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink
+      placeholder:text-ink-faint outline-none transition
+      focus:border-cinnabar-500 focus:ring-2 focus:ring-cinnabar-500/15;
+  }
+  .field-label {
+    @apply block text-xs font-medium text-ink-soft mb-1.5;
+  }
+  .field-help {
+    @apply mt-1.5 text-xs text-ink-muted leading-snug;
+  }
+  .field-error {
+    @apply text-xs text-cinnabar-700 mt-1.5;
+  }
+
+  /* The ribbon / pill vocabulary: tracked micro caps on a soft tinted bg. */
+  .ribbon {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 text-micro font-semibold uppercase rounded-sm;
+  }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .text-pretty  { text-wrap: pretty; }
+}
