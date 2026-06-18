@@ -1,0 +1,136 @@
+import { NavLink } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  Receipt,
+  CheckSquare,
+  Wallet,
+  BarChart3,
+  Store,
+  Users,
+  Bell,
+  Settings as SettingsIcon,
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext.jsx';
+import Logo from './Logo.jsx';
+import { cn } from '../lib/utils.js';
+
+const PRIMARY = [
+  { key: 'dashboard', to: '/dashboard', label: 'Overview', icon: LayoutDashboard, ownerOnly: false },
+  { key: 'expenses', to: '/expenses', label: 'Expenses', icon: Receipt, ownerOnly: false },
+  { key: 'approvals', to: '/approvals', label: 'Approvals', icon: CheckSquare, ownerOnly: true, badgeKey: 'pendingApprovals' },
+  { key: 'budgets', to: '/budgets', label: 'Budgets', icon: Wallet, ownerOnly: true },
+  { key: 'reports', to: '/reports', label: 'Reports', icon: BarChart3, ownerOnly: true },
+  { key: 'vendors', to: '/vendors', label: 'Vendors', icon: Store, ownerOnly: true },
+];
+
+const SECONDARY = [
+  { key: 'team', to: '/team', label: 'Team', icon: Users, ownerOnly: true },
+  { key: 'activity', to: '/activity', label: 'Activity', icon: Bell, ownerOnly: false },
+  { key: 'settings', to: '/settings', label: 'Settings', icon: SettingsIcon, ownerOnly: false },
+];
+
+export function Sidebar({ badges = {} }) {
+  const { role } = useAuth();
+  const isOwner = role === 'OWNER' || role === 'Owner';
+  const mobileItems = [...PRIMARY, ...SECONDARY].filter((item) => !item.ownerOnly || isOwner);
+
+  const Item = ({ item }) => {
+    const Icon = item.icon;
+    const badge = item.badgeKey ? badges[item.badgeKey] : null;
+    return (
+      <NavLink
+        to={item.to}
+        className={({ isActive }) =>
+          cn(
+            'group flex items-center gap-2.5 h-9 pl-2.5 pr-3 rounded-sm text-sm transition-colors',
+            isActive
+              ? 'bg-ink text-paper font-medium'
+              : 'text-ink-soft hover:bg-paper-deep hover:text-ink'
+          )
+        }
+      >
+        {({ isActive }) => (
+          <>
+            <Icon size={16} strokeWidth={1.5} className={cn('shrink-0', isActive ? 'text-paper' : 'text-ink-muted group-hover:text-ink')} />
+            <span className="truncate">{item.label}</span>
+            {badge != null && badge > 0 && (
+              <span
+                className={cn(
+                  'ml-auto num text-[10px] font-semibold rounded-pill px-1.5 py-0.5',
+                  isActive ? 'bg-paper/15 text-paper' : 'bg-cinnabar-50 text-cinnabar-700'
+                )}
+              >
+                {badge}
+              </span>
+            )}
+          </>
+        )}
+      </NavLink>
+    );
+  };
+
+  return (
+    <>
+      <aside className="hidden md:flex md:flex-col w-60 shrink-0 border-r border-rule bg-paper h-screen sticky top-0">
+        <div className="px-5 py-5 border-b border-rule">
+          <Logo size={28} withWordmark wordmarkSize="lg" />
+        </div>
+        <nav className="flex-1 px-2.5 py-4 overflow-y-auto">
+          <ul className="space-y-0.5">
+            {PRIMARY.map((item) => !item.ownerOnly || isOwner ? <li key={item.key}><Item item={item} /></li> : null)}
+          </ul>
+          <div className="mt-6 pt-4 border-t border-rule">
+            <p className="px-2.5 mb-2 text-micro uppercase tracking-eyebrow text-ink-muted">Workspace</p>
+            <ul className="space-y-0.5">
+              {SECONDARY.map((item) => !item.ownerOnly || isOwner ? <li key={item.key}><Item item={item} /></li> : null)}
+            </ul>
+          </div>
+        </nav>
+        <div className="px-5 py-3 border-t border-rule">
+          <p className="text-[10px] uppercase tracking-eyebrow text-ink-faint">
+            v2.0 - ledger build
+          </p>
+        </div>
+      </aside>
+
+      <nav className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-paper/95 backdrop-blur supports-[padding:max(0px)]:pb-[max(env(safe-area-inset-bottom),0px)]">
+        <ul className="flex items-stretch overflow-x-auto px-1.5 py-1.5">
+          {mobileItems.map((item) => {
+            const Icon = item.icon;
+            const badge = item.badgeKey ? badges[item.badgeKey] : null;
+            return (
+              <li key={item.key} className="min-w-[4.25rem] flex-1">
+                <NavLink
+                  to={item.to}
+                  className={({ isActive }) =>
+                    cn(
+                      'relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-sm px-2 text-[11px] font-medium transition-colors',
+                      isActive ? 'bg-ink text-paper' : 'text-ink-muted hover:bg-paper-deep hover:text-ink'
+                    )
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <Icon size={17} strokeWidth={1.6} className={isActive ? 'text-paper' : 'text-ink-muted'} />
+                      <span className="max-w-full truncate">{item.label}</span>
+                      {badge != null && badge > 0 && (
+                        <span
+                          className={cn(
+                            'absolute right-2 top-1 num min-w-4 rounded-pill px-1 text-[10px] font-semibold',
+                            isActive ? 'bg-paper/15 text-paper' : 'bg-cinnabar-500 text-paper'
+                          )}
+                        >
+                          {badge > 99 ? '99+' : badge}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </NavLink>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    </>
+  );
+}
