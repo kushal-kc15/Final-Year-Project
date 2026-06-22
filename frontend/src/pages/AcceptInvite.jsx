@@ -1,60 +1,72 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, Building2, Loader2 } from 'lucide-react';
-import Logo from '../components/Logo.jsx';
-import Button from '../components/Button.jsx';
-import api from '../lib/api.js';
-import { useAuth } from '../context/AuthContext.jsx';
-import { useToast } from '../components/Toast.jsx';
+import { useEffect, useState } from "react";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
+import { AlertTriangle, ArrowRight, Building2, Loader2 } from "lucide-react";
+import Logo from "../components/Logo.jsx";
+import Button from "../components/Button.jsx";
+import api from "../lib/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { useToast } from "../components/Toast.jsx";
 
 export default function AcceptInvite() {
   const { token } = useParams();
   const [params] = useSearchParams();
-  const inviteToken = token ?? params.get('token') ?? '';
-  const { applyAuth, user } = useAuth();
+  const inviteToken = token ?? params.get("token") ?? "";
+  const { applyAuth, refreshSession, user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const [info, setInfo] = useState(null);
-  const [state, setState] = useState(inviteToken ? 'loading' : 'error');
+  const [state, setState] = useState(inviteToken ? "loading" : "error");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
 
     if (!inviteToken) {
-      setState('error');
-      setError('Open the invitation email again or ask your team to resend it.');
+      setState("error");
+      setError(
+        "Open the invitation email again or ask your team to resend it.",
+      );
       return () => {
         cancelled = true;
       };
     }
 
     if (!user) {
-      setState('form');
-      setError('');
+      setState("form");
+      setError("");
       return () => {
         cancelled = true;
       };
     }
 
-    setState('loading');
-    setError('');
-    api.get('/invitations/pending/')
+    setState("loading");
+    setError("");
+    api
+      .get("/invitations/pending/")
       .then((r) => {
         if (cancelled) return;
         const invitations = r.data?.results ?? r.data ?? [];
-        const invitation = invitations.find((i) => String(i.token) === String(inviteToken));
+        const invitation = invitations.find(
+          (i) => String(i.token) === String(inviteToken),
+        );
         setInfo(invitation ?? null);
-        setState(invitation ? 'form' : 'error');
+        setState(invitation ? "form" : "error");
         if (!invitation) {
-          setError('This invitation may have been used, expired, or is not available for this account.');
+          setError(
+            "This invitation may have been used, expired, or is not available for this account.",
+          );
         }
       })
       .catch(() => {
         if (cancelled) return;
         setInfo(null);
-        setState('form');
+        setState("form");
       });
 
     return () => {
@@ -66,27 +78,29 @@ export default function AcceptInvite() {
     e.preventDefault();
 
     if (!user) {
-      navigate(`/register?invite=${encodeURIComponent(inviteToken)}`, { replace: true });
+      navigate(`/register?invite=${encodeURIComponent(inviteToken)}`, {
+        replace: true,
+      });
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const res = await api.post('/invitations/accept/', { token: inviteToken });
-      applyAuth(res.data);
-      toast.success('Welcome to the team.');
-      navigate('/dashboard', { replace: true });
+      await api.post("/invitations/accept/", { token: inviteToken });
+      await refreshSession();
+      toast.success("Welcome to the team.");
+      navigate("/dashboard", { replace: true });
     } catch (err) {
-      setError(err?.response?.data?.error || 'Could not accept invite.');
-      toast.error(err?.response?.data?.error || 'Could not accept invite.');
+      setError(err?.response?.data?.error || "Could not accept invite.");
+      toast.error(err?.response?.data?.error || "Could not accept invite.");
     } finally {
       setLoading(false);
     }
   };
 
-  const organizationName = info?.organization_name || 'the workspace';
+  const organizationName = info?.organization_name || "the workspace";
 
   return (
     <div className="min-h-screen flex flex-col bg-paper">
@@ -96,11 +110,21 @@ export default function AcceptInvite() {
         </Link>
         <div className="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
           {user && (
-            <Link to="/dashboard" className="hidden sm:inline-flex text-sm text-ink-soft hover:text-ink">
+            <Link
+              to="/dashboard"
+              className="hidden sm:inline-flex text-sm text-ink-soft hover:text-ink"
+            >
               Back to dashboard
             </Link>
           )}
-          <Link to="/login" className="text-sm text-ink-soft hover:text-ink">
+          <Link
+            to={
+              inviteToken
+                ? `/login?invite=${encodeURIComponent(inviteToken)}`
+                : "/login"
+            }
+            className="text-sm text-ink-soft hover:text-ink"
+          >
             Back to sign in
           </Link>
         </div>
@@ -108,7 +132,7 @@ export default function AcceptInvite() {
 
       <main className="flex-1 flex items-center justify-center px-4 py-8 sm:px-10 sm:py-10">
         <div className="w-full max-w-sm">
-          {state === 'loading' && (
+          {state === "loading" && (
             <div className="text-center space-y-4">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-paper-deep text-ink-muted">
                 <Loader2 size={24} strokeWidth={1.8} className="animate-spin" />
@@ -124,7 +148,7 @@ export default function AcceptInvite() {
             </div>
           )}
 
-          {state === 'error' && (
+          {state === "error" && (
             <div className="text-center space-y-4">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-cinnabar-50 border border-cinnabar-200 text-cinnabar-600">
                 <AlertTriangle size={24} strokeWidth={1.8} />
@@ -134,22 +158,34 @@ export default function AcceptInvite() {
                   Invitation not valid
                 </h1>
                 <p className="mt-2 text-sm text-ink-muted">
-                  {error || 'It may have been used or expired. Ask your team to resend it.'}
+                  {error ||
+                    "It may have been used or expired. Ask your team to resend it."}
                 </p>
               </div>
 
               <div className="pt-2 space-y-3">
-                <Button as={Link} to="/login" variant="primary" size="lg" className="w-full">
+                <Button
+                  as={Link}
+                  to={
+                    inviteToken
+                      ? `/login?invite=${encodeURIComponent(inviteToken)}`
+                      : "/login"
+                  }
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
+                >
                   Back to sign in
                 </Button>
                 <p className="text-xs text-ink-muted">
-                  Ask your team to resend the invitation if this link should still work.
+                  Ask your team to resend the invitation if this link should
+                  still work.
                 </p>
               </div>
             </div>
           )}
 
-          {state === 'form' && (
+          {state === "form" && (
             <div className="text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-paper-deep text-cinnabar-600">
                 <Building2 size={24} strokeWidth={1.8} />
@@ -164,11 +200,12 @@ export default function AcceptInvite() {
               <p className="mt-2 text-sm text-ink-muted">
                 {user ? (
                   <>
-                    Continue as{' '}
-                    <span className="text-ink font-medium">{user.email}</span> to join this workspace.
+                    Continue as{" "}
+                    <span className="text-ink font-medium">{user.email}</span>{" "}
+                    to join this workspace.
                   </>
                 ) : (
-                  'Create an account with the invited email and the workspace will be linked.'
+                  "Create an account with the invited email and the workspace will be linked."
                 )}
               </p>
 
@@ -179,24 +216,40 @@ export default function AcceptInvite() {
                   size="lg"
                   className="w-full"
                   disabled={loading}
-                  iconRight={loading ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
+                  iconRight={
+                    loading ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <ArrowRight size={16} />
+                    )
+                  }
                 >
                   {loading
                     ? user
-                      ? 'Accepting invite…'
-                      : 'Opening registration…'
+                      ? "Accepting invite…"
+                      : "Opening registration…"
                     : user
-                      ? 'Join the team'
-                      : 'Continue to register'}
+                      ? "Join the team"
+                      : "Continue to register"}
                 </Button>
 
                 <div className="flex items-center justify-center pt-1">
                   {user ? (
-                    <Link to="/dashboard" className="text-sm text-ink-muted hover:text-ink">
+                    <Link
+                      to="/dashboard"
+                      className="text-sm text-ink-muted hover:text-ink"
+                    >
                       Back to dashboard
                     </Link>
                   ) : (
-                    <Link to="/login" className="text-sm text-ink-muted hover:text-ink">
+                    <Link
+                      to={
+                        inviteToken
+                          ? `/login?invite=${encodeURIComponent(inviteToken)}`
+                          : "/login"
+                      }
+                      className="text-sm text-ink-muted hover:text-ink"
+                    >
                       Back to sign in
                     </Link>
                   )}
@@ -204,9 +257,7 @@ export default function AcceptInvite() {
               </form>
 
               {error && (
-                <p className="mt-4 text-xs text-cinnabar-600">
-                  {error}
-                </p>
+                <p className="mt-4 text-xs text-cinnabar-600">{error}</p>
               )}
             </div>
           )}

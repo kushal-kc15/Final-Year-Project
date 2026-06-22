@@ -19,6 +19,9 @@ const writeStored = (val) => {
   else localStorage.removeItem(STORAGE_KEY);
 };
 
+const responseValue = (data, key, fallback = null) =>
+  Object.prototype.hasOwnProperty.call(data ?? {}, key) ? data[key] : fallback;
+
 /**
  * Translate a backend auth response into the shape our context stores.
  * Backend returns `{ access, refresh, user, active_organization, role, ... }`
@@ -28,19 +31,22 @@ const normalizeAuthResponse = (data) => {
   if (!data) return null;
   return {
     user: data.user ?? null,
-    organization: data.active_organization ?? null,
+    organization: responseValue(data, 'active_organization'),
     token: data.access ?? data.token ?? null,
-    role: data.role ?? data.user?.role ?? null,
+    role: responseValue(data, 'role', data.user?.role ?? null),
   };
 };
 
 const normalizeMeResponse = (data, token) => {
   if (!data) return null;
+  const organization = Object.prototype.hasOwnProperty.call(data, 'active_organization')
+    ? data.active_organization
+    : responseValue(data, 'organization');
   return {
     user: data,
-    organization: data.active_organization ?? data.organization ?? null,
+    organization,
     token,
-    role: data.role ?? null,
+    role: responseValue(data, 'role'),
   };
 };
 
@@ -101,13 +107,10 @@ export function AuthProvider({ children }) {
     api.get('/auth/me/')
       .then((res) => {
         if (cancelled) return;
-        const me = res.data;
         const stored2 = readStored() || {};
+        const normalized = normalizeMeResponse(res.data, stored.token);
         applyAuth({
-          user: me,
-          organization: me.active_organization ?? stored2.organization ?? me.organization ?? null,
-          token: stored.token,
-          role: me.role ?? stored2.role ?? null,
+          ...normalized,
           currency: stored2.currency ?? 'NPR',
         });
       })

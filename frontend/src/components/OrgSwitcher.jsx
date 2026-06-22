@@ -10,8 +10,9 @@ import { cn } from '../lib/utils.js';
  * a small +Create option at the bottom.
  */
 export function OrgSwitcher() {
-  const { organization, setOrganization, applyAuth, token } = useAuth();
+  const { organization, setOrganization, applyAuth, token, refreshSession } = useAuth();
   const [open, setOpen] = useState(false);
+
   const [orgs, setOrgs] = useState([]);
   const [loading, setLoading] = useState(false);
   const ref = useRef(null);
@@ -39,9 +40,10 @@ export function OrgSwitcher() {
       return;
     }
     try {
-      const res = await api.post(`/organizations/${org.id}/switch/`);
-      applyAuth(res.data);
+      await api.post(`/organizations/${org.id}/switch/`);
+      await refreshSession();
     } catch {
+
       // Fall back to local switch if endpoint not implemented.
       setOrganization(org);
     }

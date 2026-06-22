@@ -44,8 +44,15 @@ export default function Login() {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
-  const destination = () => {
+  const destination = (authData) => {
     if (pendingInvite) return `/invite?token=${encodeURIComponent(pendingInvite)}`;
+    const organization = Object.prototype.hasOwnProperty.call(
+      authData ?? {},
+      'active_organization',
+    )
+      ? authData.active_organization
+      : authData?.organization ?? null;
+    if (!organization) return '/workspace/start';
     return loc.state?.from || '/dashboard';
   };
 
@@ -67,7 +74,7 @@ export default function Login() {
         return;
       }
       toast.success('Welcome back');
-      navigate(destination(), { replace: true });
+      navigate(destination(data), { replace: true });
     } catch (err) {
       const data = err?.response?.data || {};
       if (data.email_not_verified) {
@@ -98,13 +105,13 @@ export default function Login() {
     setErrors({});
     setLoading(true);
     try {
-      await verifyTwoFactorCode({
+      const data = await verifyTwoFactorCode({
         email: email.trim().toLowerCase(),
         otpCode,
         rememberMe,
       });
       toast.success('Welcome back');
-      navigate(destination(), { replace: true });
+      navigate(destination(data), { replace: true });
     } catch (err) {
       const msg = err?.response?.data?.error || 'Invalid or expired code';
       setErrors({ code: msg });
@@ -166,7 +173,7 @@ export default function Login() {
         return;
       }
       toast.success('Welcome back');
-      navigate(destination(), { replace: true });
+      navigate(destination(data), { replace: true });
     } catch (err) {
       const msg = err?.response?.data?.error || 'Google sign-in failed';
       toast.error(msg);
