@@ -149,7 +149,7 @@ function Profile() {
         </div>
       </PanelHeader>
       <form onSubmit={submit} className="space-y-4 max-w-md p-4 sm:p-5" noValidate>
-        <InlineError error={err.detail ?? err.non_field_errors} />
+        <InlineError error={err.detail || err.error || err.non_field_errors} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="First name" value={form.first_name} onChange={update('first_name')} error={err.first_name} />
           <Input label="Last name" value={form.last_name} onChange={update('last_name')} error={err.last_name} />
@@ -215,7 +215,7 @@ function Workspace() {
         </div>
       </PanelHeader>
       <form onSubmit={submit} className="space-y-4 max-w-lg p-4 sm:p-5" noValidate>
-        <InlineError error={err.detail ?? err.non_field_errors} />
+        <InlineError error={err.detail || err.error || err.non_field_errors} />
         <Input label="Workspace name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required error={err.name} />
         <Input label="Description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} error={err.description} />
         <div className="flex flex-col gap-3 border-t border-rule pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -279,7 +279,7 @@ function Preferences() {
         </div>
       </PanelHeader>
       <div className="space-y-4 max-w-md p-4 sm:p-5">
-        <InlineError error={err.detail ?? err.non_field_errors} />
+        <InlineError error={err.detail || err.error || err.non_field_errors} />
         <Select label="Display currency" value={prefs.currency} onChange={(event) => setPrefs((current) => ({ ...current, currency: normalizeCurrency(event.target.value) }))} error={err.default_currency ?? err.currency}>
           {CURRENCY_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
         </Select>
@@ -341,7 +341,7 @@ function Security() {
           </div>
         </PanelHeader>
         <form onSubmit={submit} className="space-y-4 max-w-md p-4 sm:p-5" noValidate>
-          <InlineError error={err.detail ?? err.non_field_errors} />
+          <InlineError error={err.detail || err.error || err.non_field_errors} />
           <Input type="password" label="Current password" value={pw.current} onChange={(event) => setPw((current) => ({ ...current, current: event.target.value }))} required autoComplete="current-password" error={err.current ?? err.old_password} />
           <Input type="password" label="New password" value={pw.next} onChange={(event) => setPw((current) => ({ ...current, next: event.target.value }))} required autoComplete="new-password" error={err.next ?? err.new_password} />
           <Input type="password" label="Confirm new password" value={pw.next2} onChange={(event) => setPw((current) => ({ ...current, next2: event.target.value }))} required autoComplete="new-password" error={err.next2} />

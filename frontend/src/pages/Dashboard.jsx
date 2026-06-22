@@ -1,16 +1,17 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Plus, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
-import api from '../lib/api.js';
-import { useAuth } from '../context/AuthContext.jsx';
-import { Panel } from '../components/Panel.jsx';
-import Button from '../components/Button.jsx';
-import { Money } from '../components/Money.jsx';
-import { Avatar } from '../components/Avatar.jsx';
-import { formatDate } from '../lib/date.js';
-import { Skeleton } from '../components/Feedback.jsx';
-import { cn } from '../lib/utils.js';
-import { formatCurrency } from '../lib/currency.js';
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Plus, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
+import api from "../lib/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { Panel } from "../components/Panel.jsx";
+import Button from "../components/Button.jsx";
+import { Money } from "../components/Money.jsx";
+import { Avatar } from "../components/Avatar.jsx";
+import { formatDate } from "../lib/date.js";
+import { Skeleton } from "../components/Feedback.jsx";
+import { cn } from "../lib/utils.js";
+import { formatCurrency } from "../lib/currency.js";
+import { formatCategoryLabel } from "../lib/categories.js";
 
 /* ------------------------------------------------------------------ *
  * Vyapar Margadarshan — Dashboard.
@@ -31,53 +32,54 @@ import { formatCurrency } from '../lib/currency.js';
  * the next step is genuinely the next step.
  * ------------------------------------------------------------------ */
 
-const CATEGORIES = {
-  FOOD: 'Food',
-  TRANSPORT: 'Transport',
-  OFFICE: 'Office',
-  UTILITIES: 'Utilities',
-  SALARY: 'Salary',
-  RENT: 'Rent',
-  MARKETING: 'Marketing',
-  OTHER: 'Other',
-};
-
 const STATUS_DOT = {
-  approved: 'bg-moss-500',
-  paid: 'bg-moss-500',
-  settled: 'bg-moss-500',
-  pending: 'bg-saffron-500',
-  submitted: 'bg-saffron-500',
-  draft: 'bg-ink-faint',
-  rejected: 'bg-cinnabar-500',
-  reimbursed: 'bg-ink-faint',
+  approved: "bg-moss-500",
+  paid: "bg-moss-500",
+  settled: "bg-moss-500",
+  pending: "bg-saffron-500",
+  submitted: "bg-saffron-500",
+  draft: "bg-ink-faint",
+  rejected: "bg-cinnabar-500",
+  reimbursed: "bg-ink-faint",
 };
 
 const personName = (e) =>
-  e?.submitted_by_name
-  ?? e?.user_name
-  ?? e?.user_details?.username
-  ?? '—';
+  e?.submitted_by_name ?? e?.user_name ?? e?.user_details?.username ?? "—";
 
-const categoryName = (v) => CATEGORIES[v] ?? v ?? '—';
+const categoryName = (v) => (v ? formatCategoryLabel(v) : "—");
 
 const statusName = (v) => {
-  if (!v) return 'Draft';
-  return v.toString().replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  if (!v) return "Draft";
+  return v
+    .toString()
+    .toLowerCase()
+    .replace(/[_-]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
 const currentDateString = () =>
-  new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
 const lastMonthName = () => {
   const d = new Date();
   d.setDate(0);
-  return d.toLocaleDateString(undefined, { month: 'long' });
+  return d.toLocaleDateString(undefined, { month: "long" });
 };
 
 const greeting = () => {
   const h = new Date().getHours();
-  return h < 5 ? 'Late night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  return h < 5
+    ? "Late night"
+    : h < 12
+      ? "Good morning"
+      : h < 17
+        ? "Good afternoon"
+        : "Good evening";
 };
 
 /* ------------------------------------------------------------------ *
@@ -87,7 +89,7 @@ const greeting = () => {
 function Reveal({ delay = 0, className, children }) {
   return (
     <div
-      className={cn('animate-fade-in-up', className)}
+      className={cn("animate-fade-in-up", className)}
       style={{ animationDelay: `${delay}ms` }}
     >
       {children}
@@ -130,7 +132,7 @@ function useCountUp(target, duration = 1100) {
  * - When idle: a single dot marks the last point.
  * No axes, no grid — this is supporting evidence, not the main chart.
  * ------------------------------------------------------------------ */
-function AreaChart({ data, height = 140, currency = 'NPR' }) {
+function AreaChart({ data, height = 140, currency = "NPR" }) {
   const [hover, setHover] = useState(-1);
   const ref = useRef(null);
   const [w, setW] = useState(800);
@@ -145,7 +147,7 @@ function AreaChart({ data, height = 140, currency = 'NPR' }) {
 
   const safe = useMemo(
     () => (data || []).map((d) => ({ ...d, value: Number(d.value) || 0 })),
-    [data]
+    [data],
   );
 
   if (safe.length === 0) {
@@ -164,8 +166,8 @@ function AreaChart({ data, height = 140, currency = 'NPR' }) {
   }));
 
   const line = points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-    .join(' ');
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(" ");
   const area = `${line} L${points.at(-1).x.toFixed(1)},${height} L0,${height} Z`;
   const last = points.at(-1);
 
@@ -189,7 +191,7 @@ function AreaChart({ data, height = 140, currency = 'NPR' }) {
           style={{
             strokeDasharray: w * 2,
             strokeDashoffset: w * 2,
-            animation: 'draw 1.4s 0.2s ease-out forwards',
+            animation: "draw 1.4s 0.2s ease-out forwards",
           }}
         />
         {points.map((p, i) => (
@@ -215,8 +217,18 @@ function AreaChart({ data, height = 140, currency = 'NPR' }) {
               strokeWidth={1}
               strokeDasharray="2 3"
             />
-            <circle cx={points[hover].x} cy={points[hover].y} r={4} fill="#c2412a" />
-            <circle cx={points[hover].x} cy={points[hover].y} r={2} fill="#fbfaf7" />
+            <circle
+              cx={points[hover].x}
+              cy={points[hover].y}
+              r={4}
+              fill="#c2412a"
+            />
+            <circle
+              cx={points[hover].x}
+              cy={points[hover].y}
+              r={2}
+              fill="#fbfaf7"
+            />
           </>
         )}
         {last && hover < 0 && (
@@ -229,10 +241,11 @@ function AreaChart({ data, height = 140, currency = 'NPR' }) {
           style={{
             left: points[hover].x,
             top: points[hover].y - 8,
-            transform: 'translate(-50%, -100%)',
+            transform: "translate(-50%, -100%)",
           }}
         >
-          {points[hover].label} · {formatCurrency(points[hover].value, currency)}
+          {points[hover].label} ·{" "}
+          {formatCurrency(points[hover].value, currency)}
         </div>
       )}
     </div>
@@ -241,11 +254,12 @@ function AreaChart({ data, height = 140, currency = 'NPR' }) {
 
 /** A 6px dot that encodes status. Tiny, but enough to scan a list. */
 function StatusDot({ status }) {
-  const tone = STATUS_DOT[status] ?? 'bg-ink-faint';
+  const tone =
+    STATUS_DOT[(status ?? "").toString().toLowerCase()] ?? "bg-ink-faint";
   return (
     <span
       aria-hidden
-      className={cn('inline-block h-1.5 w-1.5 rounded-pill shrink-0', tone)}
+      className={cn("inline-block h-1.5 w-1.5 rounded-pill shrink-0", tone)}
     />
   );
 }
@@ -260,9 +274,10 @@ export default function Dashboard() {
   // If role cannot be determined, we fall back to the safest behavior:
   // show all sections (keeps build + avoids accidentally hiding critical info).
   const rawRole = user?.role ?? authRole ?? null;
-  const normalizedRole = typeof rawRole === 'string' ? rawRole.toLowerCase() : '';
-  const isOwner = /owner|org[_ -]?manager|manager/.test(normalizedRole);
-  const isStaff = !isOwner && /staff/.test(normalizedRole);
+  const normalizedRole =
+    typeof rawRole === "string" ? rawRole.toLowerCase() : "";
+  const isOwner = normalizedRole === "owner";
+  const isStaff = normalizedRole === "staff";
   const roleUnclear = !!rawRole && !isOwner && !isStaff;
   const showAwaitingReview = isOwner || (!rawRole ? true : roleUnclear);
   const showBudgets = isOwner || (!rawRole ? true : roleUnclear);
@@ -275,53 +290,69 @@ export default function Dashboard() {
   const [pending, setPending] = useState([]);
   const [budgets, setBudgets] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [lastMonthSpend, setLastMonthSpend] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const finish = () => { if (!cancelled) setLoading(false); };
+    const finish = () => {
+      if (!cancelled) setLoading(false);
+    };
     // A hung endpoint must never pin the page on a skeleton.
     const maxWait = setTimeout(finish, 2500);
 
-    api.get('/expenses/dashboard_metrics/')
+    api
+      .get("/expenses/dashboard_metrics/")
       .then((r) => {
-        if (!cancelled) setSummary((s) => ({ ...(s ?? {}), ...(r.data ?? {}) }));
+        if (!cancelled)
+          setSummary((s) => ({ ...(s ?? {}), ...(r.data ?? {}) }));
         finish();
+      })
+      .catch(() => {
+        if (!cancelled) finish();
+      });
+
+    api
+      .get("/expenses/", { params: { page_size: 8 } })
+      .then((r) => {
+        if (!cancelled) setRecent(r.data?.results ?? r.data ?? []);
       })
       .catch(() => {});
 
-    api.get('/expenses/', { params: { page_size: 8 } })
-      .then((r) => { if (!cancelled) setRecent(r.data?.results ?? r.data ?? []); })
+    api
+      .get("/expenses/pending_approvals/")
+      .then((r) => {
+        if (!cancelled) setPending(r.data?.results ?? r.data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setPending([]);
+      });
+
+    api
+      .get("/budgets/", { params: { active: true, page_size: 6 } })
+      .then((r) => {
+        if (!cancelled) setBudgets(r.data?.results ?? r.data ?? []);
+      })
       .catch(() => {});
 
-    api.get('/expenses/pending_approvals/')
-      .then((r) => { if (!cancelled) setPending(r.data?.results ?? r.data ?? []); })
-      .catch(() => { if (!cancelled) setPending([]); });
-
-    api.get('/budgets/', { params: { active: true, page_size: 6 } })
-      .then((r) => { if (!cancelled) setBudgets(r.data?.results ?? r.data ?? []); })
-      .catch(() => {});
-
-    api.get('/analytics/category-breakdown/')
+    api
+      .get("/analytics/category-breakdown/")
       .then((r) => {
         if (!cancelled) {
-          const data = r.data?.breakdown ?? r.data?.categories ?? r.data?.results ?? r.data ?? [];
+          const data =
+            r.data?.breakdown ??
+            r.data?.categories ??
+            r.data?.results ??
+            r.data ??
+            [];
           setCategories(Array.isArray(data) ? data : []);
         }
       })
       .catch(() => {});
 
-    // Best-effort last-month spend for the delta indicator.
-    api.get('/expenses/dashboard_metrics/', { params: { period: 'last_month' } })
-      .then((r) => {
-        if (!cancelled) {
-          setLastMonthSpend(r.data?.metrics?.month?.total ?? null);
-        }
-      })
-      .catch(() => {});
-
-    return () => { cancelled = true; clearTimeout(maxWait); };
+    return () => {
+      cancelled = true;
+      clearTimeout(maxWait);
+    };
   }, []);
 
   // Last 7 days series (zero-filled if backend doesn't include points).
@@ -331,31 +362,41 @@ export default function Dashboard() {
       const d = new Date();
       d.setDate(d.getDate() - (days - 1 - i));
       return {
-        label: d.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3),
+        label: d
+          .toLocaleDateString(undefined, { weekday: "short" })
+          .slice(0, 3),
         value: 0,
         date: d.toDateString(),
       };
     });
     const points = summary?.last_7_days ?? summary?.metrics?.last_7_days ?? [];
     points.forEach((p) => {
-      const idx = out.findIndex((o) => o.date === new Date(p.date).toDateString());
+      const idx = out.findIndex(
+        (o) => o.date === new Date(p.date).toDateString(),
+      );
       if (idx >= 0) out[idx].value = Number(p.amount) || 0;
     });
     return out;
   }, [summary]);
 
-  const todaySpend = summary?.metrics?.today?.total ?? 0;
-  const weekSpend  = summary?.metrics?.week?.total  ?? weekSeries.reduce((s, d) => s + d.value, 0);
-  const monthSpend = summary?.metrics?.month?.total ?? 0;
-  const monthBudget = summary?.month_budget ?? summary?.metrics?.month?.budget ?? 0;
-  const monthPct = monthBudget > 0 ? Math.min(100, Math.round((monthSpend / monthBudget) * 100)) : null;
-  const pendingAmount = pending.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const todaySpend = summary?.today?.total ?? 0;
+  const weekSpend =
+    summary?.week?.total ??
+    weekSeries.reduce((s, d) => s + d.value, 0);
+  const monthSpend = summary?.month?.total ?? 0;
+  const monthBudget =
+    summary?.month_budget ?? summary?.month?.budget ?? 0;
+  const monthPct =
+    monthBudget > 0
+      ? Math.min(100, Math.round((monthSpend / monthBudget) * 100))
+      : null;
+  const pendingAmount = pending.reduce(
+    (s, e) => s + (Number(e.amount) || 0),
+    0,
+  );
 
   // Delta vs last month. Less = good (moss), more = bad (cinnabar).
-  const monthDelta =
-    lastMonthSpend != null && lastMonthSpend > 0
-      ? Math.round(((monthSpend - lastMonthSpend) / lastMonthSpend) * 100)
-      : null;
+  const monthDelta = summary?.month?.growth ?? null;
 
   const topCategories = useMemo(() => {
     const byCat = new Map();
@@ -368,7 +409,11 @@ export default function Dashboard() {
     return Array.from(byCat.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
-      .map(([name, value]) => ({ name, value, pct: Math.max(2, Math.round((value / total) * 100)) }));
+      .map(([name, value]) => ({
+        name,
+        value,
+        pct: Math.max(2, Math.round((value / total) * 100)),
+      }));
   }, [categories]);
 
   const animatedMonth = useCountUp(monthSpend);
@@ -376,8 +421,8 @@ export default function Dashboard() {
   const staffRecentSubmitted = useMemo(() => {
     const arr = Array.isArray(recent) ? recent : [];
     return arr.filter((e) => {
-      const st = (e?.status ?? '').toString().toLowerCase();
-      return st === 'submitted' || st === 'paid' || st === 'settled';
+      const st = (e?.status ?? "").toString().toLowerCase();
+      return st === "pending" || st === "approved" || st === "rejected";
     });
   }, [recent]);
 
@@ -385,36 +430,40 @@ export default function Dashboard() {
   const staffPendingCount = pending.length;
 
   const roleExplain = roleUnclear
-    ? 'Role not detected; showing all sections.'
+    ? "Role not detected; showing all sections."
     : isOwner
-      ? 'Owner view'
-      : 'Staff view';
+      ? "Owner view"
+      : "Staff view";
 
   if (loading) return <DashboardSkeleton />;
 
   return (
     <div className="px-4 sm:px-5 lg:px-8 py-3 sm:py-4 max-w-[1400px] mx-auto w-full">
-
       {/* Command bar — single line, no chrome */}
       <Reveal delay={0}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4 pb-2.5 border-b border-rule gap-3 sm:gap-4">
           <p className="text-sm text-ink-muted min-w-0 sm:truncate leading-relaxed">
             <span className="text-ink font-medium">
-              {greeting()}{user?.first_name ? `, ${user.first_name}` : ''}
+              {greeting()}
+              {user?.first_name ? `, ${user.first_name}` : ""}
             </span>
             <span className="mx-2 text-ink-faint">·</span>
             <span className="num">{currentDateString()}</span>
             <span className="mx-2 text-ink-faint">·</span>
-            <span className="text-ink">{organization?.name ?? 'Workspace'}</span>
+            <span className="text-ink">
+              {organization?.name ?? "Workspace"}
+            </span>
           </p>
           <div className="flex w-full flex-wrap items-center gap-2 shrink-0 sm:w-auto sm:justify-end">
-            <Button as={Link} to="/expenses" variant="ghost" size="sm">All expenses</Button>
+            <Button as={Link} to="/expenses" variant="ghost" size="sm">
+              All expenses
+            </Button>
             <Button
               variant="primary"
               size="sm"
               className="sm:w-auto"
               iconLeft={<Plus size={14} strokeWidth={2} />}
-              onClick={() => navigate('/expenses?new=1')}
+              onClick={() => navigate("/expenses?new=1")}
             >
               Add expense
             </Button>
@@ -431,7 +480,8 @@ export default function Dashboard() {
             </p>
             {monthBudget > 0 && (
               <p className="text-xs text-ink-muted num">
-                <span className="text-ink font-medium">{monthPct}%</span> of {formatCurrency(monthBudget, currency)} budget
+                <span className="text-ink font-medium">{monthPct}%</span> of{" "}
+                {formatCurrency(monthBudget, currency)} budget
               </p>
             )}
           </div>
@@ -443,20 +493,31 @@ export default function Dashboard() {
               <div className="flex sm:flex-col items-center sm:items-start gap-2 sm:gap-0 sm:pb-2">
                 <span
                   className={cn(
-                    'text-base font-medium num inline-flex items-center gap-0.5',
-                    monthDelta <= 0 ? 'text-moss-700' : 'text-cinnabar-700'
+                    "text-base font-medium num inline-flex items-center gap-0.5",
+                    monthDelta <= 0 ? "text-moss-700" : "text-cinnabar-700",
                   )}
                 >
-                  {monthDelta <= 0 ? <TrendingDown size={15} /> : <TrendingUp size={15} />}
+                  {monthDelta <= 0 ? (
+                    <TrendingDown size={15} />
+                  ) : (
+                    <TrendingUp size={15} />
+                  )}
                   {Math.abs(monthDelta)}%
                 </span>
-                <span className="text-[11px] text-ink-muted">vs {lastMonthName()}</span>
+                <span className="text-[11px] text-ink-muted">
+                  vs {lastMonthName()}
+                </span>
               </div>
             )}
             {monthBudget === 0 && (
               <div className="flex flex-col pb-2">
                 <span className="text-xs text-ink-muted">
-                  <Link to="/budgets" className="text-cinnabar-600 hover:underline">Set a monthly budget →</Link>
+                  <Link
+                    to="/budgets"
+                    className="text-cinnabar-600 hover:underline"
+                  >
+                    Set a monthly budget →
+                  </Link>
                 </span>
               </div>
             )}
@@ -473,12 +534,23 @@ export default function Dashboard() {
               label="This week"
               value={<Money value={weekSpend} currency={currency} size="xl" />}
               hint={
-                todaySpend > 0
-                  ? <>incl. <Money value={todaySpend} currency={currency} size="xs" muted /> today</>
-                  : 'no spend yet'
+                todaySpend > 0 ? (
+                  <>
+                    incl.{" "}
+                    <Money
+                      value={todaySpend}
+                      currency={currency}
+                      size="xs"
+                      muted
+                    />{" "}
+                    today
+                  </>
+                ) : (
+                  "no spend yet"
+                )
               }
             />
-            {(showAwaitingReview) && (
+            {showAwaitingReview && (
               <Stat
                 label="Awaiting review"
                 value={
@@ -487,9 +559,16 @@ export default function Dashboard() {
                   </span>
                 }
                 hint={
-                  pendingAmount > 0
-                    ? <Money value={pendingAmount} currency={currency} size="sm" muted />
-                    : 'all clear'
+                  pendingAmount > 0 ? (
+                    <Money
+                      value={pendingAmount}
+                      currency={currency}
+                      size="sm"
+                      muted
+                    />
+                  ) : (
+                    "all clear"
+                  )
                 }
               />
             )}
@@ -506,7 +585,7 @@ export default function Dashboard() {
                     ? `${staffPendingCount} pending`
                     : staffSubmittedCount > 0
                       ? `${staffSubmittedCount} submitted`
-                      : 'no activity yet'
+                      : "no activity yet"
                 }
               />
             )}
@@ -521,30 +600,39 @@ export default function Dashboard() {
                 </span>
               }
               value={<Money value={todaySpend} currency={currency} size="xl" />}
-              hint={todaySpend > 0 ? 'logged today' : 'no spend yet'}
+              hint={todaySpend > 0 ? "logged today" : "no spend yet"}
             />
             {showBudgets && (
               <Stat
                 label="Budget"
-              value={
-                monthPct != null ? (
-                  <span
-                    className={cn(
-                      'text-2xl font-semibold num leading-none tabular-nums',
-                      monthPct >= 85 ? 'text-cinnabar-700' : 'text-ink'
-                    )}
-                  >
-                    {monthPct}%
-                  </span>
-                ) : (
-                  <span className="text-2xl font-semibold num text-ink-faint leading-none">—</span>
-                )
-              }
-              hint={
-                monthPct != null
-                  ? `${Math.max(0, 100 - monthPct)}% remaining`
-                  : <Link to="/budgets" className="text-cinnabar-600 hover:underline">Set budget</Link>
-              }
+                value={
+                  monthPct != null ? (
+                    <span
+                      className={cn(
+                        "text-2xl font-semibold num leading-none tabular-nums",
+                        monthPct >= 85 ? "text-cinnabar-700" : "text-ink",
+                      )}
+                    >
+                      {monthPct}%
+                    </span>
+                  ) : (
+                    <span className="text-2xl font-semibold num text-ink-faint leading-none">
+                      —
+                    </span>
+                  )
+                }
+                hint={
+                  monthPct != null ? (
+                    `${Math.max(0, 100 - monthPct)}% remaining`
+                  ) : (
+                    <Link
+                      to="/budgets"
+                      className="text-cinnabar-600 hover:underline"
+                    >
+                      Set budget
+                    </Link>
+                  )
+                }
               />
             )}
           </div>
@@ -564,10 +652,12 @@ export default function Dashboard() {
             <div className="px-4 sm:px-5 py-3.5 border-b border-rule flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="text-sm font-medium text-ink">
-                  {isStaff ? 'My recent expenses' : 'Recent activity'}
+                  {isStaff ? "My recent expenses" : "Recent activity"}
                 </h3>
                 <p className="mt-0.5 text-xs text-ink-muted">
-                  {isStaff ? 'Latest submissions and status.' : 'Latest workspace ledger entries.'}
+                  {isStaff
+                    ? "Latest submissions and status."
+                    : "Latest workspace ledger entries."}
                 </p>
               </div>
               <Link
@@ -579,18 +669,26 @@ export default function Dashboard() {
             </div>
             {recent.length === 0 ? (
               <EmptyState
-                title={isStaff ? 'No submitted expenses yet' : 'No ledger entries yet'}
-                description={isStaff ? 'Submit an expense to start tracking its status.' : 'Add the first workspace expense to start the ledger.'}
-                action={(
+                title={
+                  isStaff
+                    ? "No submitted expenses yet"
+                    : "No ledger entries yet"
+                }
+                description={
+                  isStaff
+                    ? "Submit an expense to start tracking its status."
+                    : "Add the first workspace expense to start the ledger."
+                }
+                action={
                   <Button
                     variant="primary"
                     size="sm"
                     iconLeft={<Plus size={14} strokeWidth={2} />}
-                    onClick={() => navigate('/expenses?new=1')}
+                    onClick={() => navigate("/expenses?new=1")}
                   >
                     Add expense
                   </Button>
-                )}
+                }
               />
             ) : (
               <table className="w-full text-sm block sm:table">
@@ -598,7 +696,9 @@ export default function Dashboard() {
                   <tr className="text-left text-[10px] uppercase tracking-eyebrow text-ink-faint">
                     <th className="px-5 py-2 font-medium w-16">Date</th>
                     <th className="py-2 font-medium">Vendor</th>
-                    <th className="py-2 font-medium hidden md:table-cell">Category</th>
+                    <th className="py-2 font-medium hidden md:table-cell">
+                      Category
+                    </th>
                     <th className="py-2 font-medium w-4"></th>
                     <th className="py-2 font-medium text-right pr-5">Amount</th>
                   </tr>
@@ -607,13 +707,17 @@ export default function Dashboard() {
                   {recent.slice(0, 7).map((e, i) => (
                     <tr
                       key={e.id}
-                      onClick={() => navigate(`/expenses/${e.id}`)}
+                      onClick={() => navigate("/expenses")}
                       className="group block sm:table-row cursor-pointer hover:bg-paper-deep/60 transition-colors animate-fade-in px-4 py-3 sm:p-0"
                       style={{ animationDelay: `${300 + i * 40}ms` }}
                     >
                       <td className="flex items-center justify-between gap-4 sm:table-cell sm:px-5 sm:py-2.5 text-[11px] text-ink-faint num tabular-nums">
-                        <span className="sm:hidden uppercase tracking-eyebrow text-ink-faint">Date</span>
-                        <span>{formatDate(e.date ?? e.created_at, 'short')}</span>
+                        <span className="sm:hidden uppercase tracking-eyebrow text-ink-faint">
+                          Date
+                        </span>
+                        <span>
+                          {formatDate(e.date ?? e.created_at, "short")}
+                        </span>
                       </td>
                       <td className="block sm:table-cell py-2 sm:py-2.5 min-w-0">
                         <span className="text-ink truncate block">
@@ -624,19 +728,31 @@ export default function Dashboard() {
                         </span>
                       </td>
                       <td className="flex items-center justify-between gap-4 sm:table-cell sm:py-2.5 text-ink-muted">
-                        <span className="sm:hidden text-[11px] uppercase tracking-eyebrow text-ink-faint">Category</span>
+                        <span className="sm:hidden text-[11px] uppercase tracking-eyebrow text-ink-faint">
+                          Category
+                        </span>
                         <span>{categoryName(e.category)}</span>
                       </td>
                       <td className="flex items-center justify-between gap-4 sm:table-cell sm:py-2.5">
-                        <span className="sm:hidden text-[11px] uppercase tracking-eyebrow text-ink-faint">Status</span>
+                        <span className="sm:hidden text-[11px] uppercase tracking-eyebrow text-ink-faint">
+                          Status
+                        </span>
                         <span className="inline-flex items-center gap-2 text-xs text-ink-muted">
                           <StatusDot status={e.status} />
-                          <span className="sm:hidden">{statusName(e.status)}</span>
+                          <span className="sm:hidden">
+                            {statusName(e.status)}
+                          </span>
                         </span>
                       </td>
                       <td className="flex items-center justify-between gap-4 sm:table-cell sm:py-2.5 num sm:text-right sm:pr-5 text-ink">
-                        <span className="sm:hidden text-[11px] uppercase tracking-eyebrow text-ink-faint">Amount</span>
-                        <Money value={e.amount} currency={e.currency ?? currency} size="sm" />
+                        <span className="sm:hidden text-[11px] uppercase tracking-eyebrow text-ink-faint">
+                          Amount
+                        </span>
+                        <Money
+                          value={e.amount}
+                          currency={e.currency ?? currency}
+                          size="sm"
+                        />
                       </td>
                     </tr>
                   ))}
@@ -651,7 +767,9 @@ export default function Dashboard() {
             <Panel>
               <div className="px-4 sm:px-5 py-3.5 border-b border-rule">
                 <h3 className="text-sm font-medium text-ink">Top categories</h3>
-                <p className="mt-0.5 text-xs text-ink-muted">Spending concentration this period.</p>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  Spending concentration this period.
+                </p>
               </div>
               {topCategories.length === 0 ? (
                 <EmptyState
@@ -664,10 +782,19 @@ export default function Dashboard() {
                   {topCategories.map((c, i) => (
                     <li key={c.name} className="space-y-1.5">
                       <div className="flex items-baseline justify-between text-xs">
-                        <span className="min-w-0 break-words text-ink">{c.name}</span>
+                        <span className="min-w-0 break-words text-ink">
+                          {c.name}
+                        </span>
                         <span className="num text-ink-muted flex items-baseline gap-2">
-                          <Money value={c.value} currency={currency} size="xs" muted />
-                          <span className="text-ink-faint num tabular-nums w-7 text-right">{c.pct}%</span>
+                          <Money
+                            value={c.value}
+                            currency={currency}
+                            size="xs"
+                            muted
+                          />
+                          <span className="text-ink-faint num tabular-nums w-7 text-right">
+                            {c.pct}%
+                          </span>
                         </span>
                       </div>
                       <div className="h-1 bg-rule rounded-pill overflow-hidden">
@@ -691,8 +818,12 @@ export default function Dashboard() {
               <Panel>
                 <div className="px-4 sm:px-5 py-3.5 border-b border-rule flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-medium text-ink">Awaiting review</h3>
-                    <p className="mt-0.5 text-xs text-ink-muted">Expenses waiting for a decision.</p>
+                    <h3 className="text-sm font-medium text-ink">
+                      Awaiting review
+                    </h3>
+                    <p className="mt-0.5 text-xs text-ink-muted">
+                      Expenses waiting for a decision.
+                    </p>
                   </div>
                   {pending.length > 0 && (
                     <Link
@@ -716,15 +847,23 @@ export default function Dashboard() {
                         key={e.id}
                         className="px-4 py-2.5 flex items-center gap-3 hover:bg-paper-deep/40 transition-colors cursor-pointer animate-fade-in sm:px-5"
                         style={{ animationDelay: `${400 + i * 40}ms` }}
-                        onClick={() => navigate(`/expenses/${e.id}`)}
+                        onClick={() => navigate("/expenses")}
                       >
                         <Avatar name={personName(e)} size={28} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-ink truncate">{e.title ?? e.description}</p>
-                          <p className="text-[11px] text-ink-muted truncate">{personName(e)}</p>
+                          <p className="text-sm text-ink truncate">
+                            {e.title ?? e.description}
+                          </p>
+                          <p className="text-[11px] text-ink-muted truncate">
+                            {personName(e)}
+                          </p>
                         </div>
                         <span className="num shrink-0 text-right text-sm text-ink">
-                          <Money value={e.amount} currency={e.currency ?? currency} size="sm" />
+                          <Money
+                            value={e.amount}
+                            currency={e.currency ?? currency}
+                            size="sm"
+                          />
                         </span>
                       </li>
                     ))}
@@ -734,17 +873,24 @@ export default function Dashboard() {
             ) : (
               <Panel>
                 <div className="px-4 sm:px-5 py-3.5 border-b border-rule">
-                  <h3 className="text-sm font-medium text-ink">Staff actions</h3>
-                  <p className="mt-0.5 text-xs text-ink-muted">Submit a new expense and track it from the ledger.</p>
+                  <h3 className="text-sm font-medium text-ink">
+                    Staff actions
+                  </h3>
+                  <p className="mt-0.5 text-xs text-ink-muted">
+                    Submit a new expense and track it from the ledger.
+                  </p>
                 </div>
                 <div className="px-4 sm:px-5 py-5">
-                  <p className="text-sm text-ink-muted">Use the expense form for receipts, purchases, travel, and business costs.</p>
+                  <p className="text-sm text-ink-muted">
+                    Use the expense form for receipts, purchases, travel, and
+                    business costs.
+                  </p>
                   <Button
                     variant="primary"
                     size="sm"
                     className="mt-4"
                     iconLeft={<Plus size={14} strokeWidth={2} />}
-                    onClick={() => navigate('/expenses?new=1')}
+                    onClick={() => navigate("/expenses?new=1")}
                   >
                     New expense
                   </Button>
@@ -761,8 +907,12 @@ export default function Dashboard() {
           <Panel>
             <div className="px-4 sm:px-5 py-3.5 border-b border-rule flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-sm font-medium text-ink">Budgets in force</h3>
-                <p className="mt-0.5 text-xs text-ink-muted">Active limits and usage by period.</p>
+                <h3 className="text-sm font-medium text-ink">
+                  Budgets in force
+                </h3>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  Active limits and usage by period.
+                </p>
               </div>
               <Link
                 to="/budgets"
@@ -771,82 +921,97 @@ export default function Dashboard() {
                 All budgets <ChevronRight size={12} />
               </Link>
             </div>
-          {budgets.length === 0 ? (
-            <EmptyState
-              title="No active budgets"
-              description="Set a limit to compare approved spend."
-              action={(
-                <Button as={Link} to="/budgets" variant="primary" size="sm">
-                  Set up budget
-                </Button>
-              )}
-            />
-          ) : (
-            <table className="w-full text-sm block sm:table">
-              <thead className="hidden sm:table-header-group">
-                <tr className="text-left text-[10px] uppercase tracking-eyebrow text-ink-faint">
-                  <th className="px-5 py-2 font-medium">Category</th>
-                  <th className="py-2 font-medium hidden sm:table-cell">Period</th>
-                  <th className="py-2 font-medium">Usage</th>
-                  <th className="py-2 font-medium text-right">Spent</th>
-                  <th className="px-5 py-2 font-medium text-right">Budget</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-rule block sm:table-row-group">
-                {budgets.map((b, i) => {
-                  const spent = Number(b.spent_amount ?? b.spent) || 0;
-                  const total = Number(b.amount) || 0;
-                  const pct = Number(
-                    b.percentage_used ?? (total > 0 ? Math.min(100, Math.round((spent / total) * 100)) : 0)
-                  );
-                  const overPct = pct >= 85;
-                  return (
-                    <tr
-                      key={b.id}
-                      className="block sm:table-row hover:bg-paper-deep/40 transition-colors animate-fade-in px-4 py-3 sm:p-0"
-                      style={{ animationDelay: `${460 + i * 40}ms` }}
-                    >
-                      <td className="block sm:table-cell sm:px-5 sm:py-2.5 text-ink font-medium sm:font-normal">{b.name || categoryName(b.category)}</td>
-                      <td className="flex items-center justify-between gap-4 sm:table-cell sm:py-2.5 text-ink-muted">
-                        <span className="sm:hidden text-[11px] uppercase tracking-eyebrow text-ink-faint">Period</span>
-                        <span>{b.period ?? 'Monthly'}</span>
-                      </td>
-                      <td className="block sm:table-cell py-2 sm:py-2.5">
-                        <div className="flex items-center gap-2">
-                          <div className="h-1.5 sm:h-1 flex-1 sm:max-w-[120px] bg-rule rounded-pill overflow-hidden">
-                            <div
-                              className={cn(
-                                'h-full rounded-pill transition-[width] duration-700 ease-out',
-                                overPct ? 'bg-cinnabar-500' : 'bg-ink'
-                              )}
-                              style={{ width: `${Math.min(100, pct)}%` }}
-                            />
-                          </div>
-                          <span
-                            className={cn(
-                              'num text-[11px] tabular-nums w-8 text-right',
-                              overPct ? 'text-cinnabar-700' : 'text-ink-muted'
-                            )}
-                          >
-                            {pct}%
+            {budgets.length === 0 ? (
+              <EmptyState
+                title="No active budgets"
+                description="Set a limit to compare approved spend."
+                action={
+                  <Button as={Link} to="/budgets" variant="primary" size="sm">
+                    Set up budget
+                  </Button>
+                }
+              />
+            ) : (
+              <table className="w-full text-sm block sm:table">
+                <thead className="hidden sm:table-header-group">
+                  <tr className="text-left text-[10px] uppercase tracking-eyebrow text-ink-faint">
+                    <th className="px-5 py-2 font-medium">Category</th>
+                    <th className="py-2 font-medium hidden sm:table-cell">
+                      Period
+                    </th>
+                    <th className="py-2 font-medium">Usage</th>
+                    <th className="py-2 font-medium text-right">Spent</th>
+                    <th className="px-5 py-2 font-medium text-right">Budget</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-rule block sm:table-row-group">
+                  {budgets.map((b, i) => {
+                    const spent = Number(b.spent_amount ?? b.spent) || 0;
+                    const total = Number(b.amount) || 0;
+                    const pct = Number(
+                      b.percentage_used ??
+                        (total > 0
+                          ? Math.min(100, Math.round((spent / total) * 100))
+                          : 0),
+                    );
+                    const overPct = pct >= 85;
+                    return (
+                      <tr
+                        key={b.id}
+                        className="block sm:table-row hover:bg-paper-deep/40 transition-colors animate-fade-in px-4 py-3 sm:p-0"
+                        style={{ animationDelay: `${460 + i * 40}ms` }}
+                      >
+                        <td className="block sm:table-cell sm:px-5 sm:py-2.5 text-ink font-medium sm:font-normal">
+                          {b.name || categoryName(b.category)}
+                        </td>
+                        <td className="flex items-center justify-between gap-4 sm:table-cell sm:py-2.5 text-ink-muted">
+                          <span className="sm:hidden text-[11px] uppercase tracking-eyebrow text-ink-faint">
+                            Period
                           </span>
-                        </div>
-                      </td>
-                      <td className="flex items-center justify-between gap-4 sm:table-cell sm:py-2.5 num sm:text-right text-ink">
-                        <span className="sm:hidden text-[11px] uppercase tracking-eyebrow text-ink-faint">Spent</span>
-                        <Money value={spent} currency={currency} size="sm" />
-                      </td>
-                      <td className="flex items-center justify-between gap-4 sm:table-cell sm:px-5 sm:py-2.5 num sm:text-right text-ink-muted">
-                        <span className="sm:hidden text-[11px] uppercase tracking-eyebrow text-ink-faint">Budget</span>
-                        <Money value={total} currency={currency} size="sm" />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </Panel>
+                          <span>{b.period ?? "Monthly"}</span>
+                        </td>
+                        <td className="block sm:table-cell py-2 sm:py-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 sm:h-1 flex-1 sm:max-w-[120px] bg-rule rounded-pill overflow-hidden">
+                              <div
+                                className={cn(
+                                  "h-full rounded-pill transition-[width] duration-700 ease-out",
+                                  overPct ? "bg-cinnabar-500" : "bg-ink",
+                                )}
+                                style={{ width: `${Math.min(100, pct)}%` }}
+                              />
+                            </div>
+                            <span
+                              className={cn(
+                                "num text-[11px] tabular-nums w-8 text-right",
+                                overPct
+                                  ? "text-cinnabar-700"
+                                  : "text-ink-muted",
+                              )}
+                            >
+                              {pct}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="flex items-center justify-between gap-4 sm:table-cell sm:py-2.5 num sm:text-right text-ink">
+                          <span className="sm:hidden text-[11px] uppercase tracking-eyebrow text-ink-faint">
+                            Spent
+                          </span>
+                          <Money value={spent} currency={currency} size="sm" />
+                        </td>
+                        <td className="flex items-center justify-between gap-4 sm:table-cell sm:px-5 sm:py-2.5 num sm:text-right text-ink-muted">
+                          <span className="sm:hidden text-[11px] uppercase tracking-eyebrow text-ink-faint">
+                            Budget
+                          </span>
+                          <Money value={total} currency={currency} size="sm" />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </Panel>
         )}
       </Reveal>
     </div>
@@ -860,16 +1025,22 @@ export default function Dashboard() {
 function Stat({ label, value, hint }) {
   return (
     <div className="p-4 lg:p-5 flex flex-col gap-1.5 min-w-0 basis-full min-[420px]:basis-1/2 lg:basis-1/4 flex-1">
-      <div className="text-micro uppercase tracking-eyebrow text-ink-muted">{label}</div>
+      <div className="text-micro uppercase tracking-eyebrow text-ink-muted">
+        {label}
+      </div>
       <div className="min-w-0">{value}</div>
-      {hint != null && <div className="text-xs text-ink-muted truncate">{hint}</div>}
+      {hint != null && (
+        <div className="text-xs text-ink-muted truncate">{hint}</div>
+      )}
     </div>
   );
 }
 
 function EmptyState({ title, description, action, compact = false }) {
   return (
-    <div className={cn('px-5 text-center', compact ? 'py-8' : 'py-12 sm:py-14')}>
+    <div
+      className={cn("px-5 text-center", compact ? "py-8" : "py-12 sm:py-14")}
+    >
       <p className="text-sm font-medium text-ink">{title}</p>
       {description && (
         <p className="mt-1.5 mx-auto max-w-sm text-sm text-ink-muted leading-relaxed">
@@ -889,8 +1060,8 @@ function DashboardSkeleton() {
       aria-busy="true"
       aria-label="Loading dashboard"
     >
-        <Skeleton className="h-10 w-full mb-4" />
-        <Skeleton className="h-60 w-full mb-3" />
+      <Skeleton className="h-10 w-full mb-4" />
+      <Skeleton className="h-60 w-full mb-3" />
       <Skeleton className="h-24 w-full mb-3" />
       <div className="grid grid-cols-12 gap-3 mb-3">
         <Skeleton className="col-span-12 lg:col-span-8 h-80" />

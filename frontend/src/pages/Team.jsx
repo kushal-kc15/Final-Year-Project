@@ -156,8 +156,10 @@ export default function Team() {
       toast.success('Member removed.');
       setRemoveTarget(null);
       refresh();
-    } catch {
-      toast.error('Could not remove member.');
+    } catch (error) {
+      const data = error?.response?.data;
+      const backendMessage = data?.detail || data?.error || data?.message || (Array.isArray(data?.non_field_errors) ? data.non_field_errors.join(' ') : data?.non_field_errors);
+      toast.error(backendMessage || 'Could not remove member.');
     } finally {
       setRemoving(false);
     }
@@ -174,8 +176,10 @@ export default function Team() {
       await api.patch(`/organizations/${organizationId}/update_member_role/`, { member_id: member.id, role: nextRole });
       toast.success('Role updated.');
       refresh();
-    } catch {
-      toast.error('Could not change role.');
+    } catch (error) {
+      const data = error?.response?.data;
+      const backendMessage = data?.detail || data?.error || data?.message || (Array.isArray(data?.non_field_errors) ? data.non_field_errors.join(' ') : data?.non_field_errors);
+      toast.error(backendMessage || 'Could not change role.');
     } finally {
       setSavingRoleId(null);
     }
@@ -470,11 +474,16 @@ function InviteEditor({ onClose, onSaved }) {
     } catch (error) {
       const data = error?.response?.data;
       if (data && typeof data === 'object') {
-        const fieldErrors = {};
+        const nonFieldKeys = ['detail', 'error', 'non_field_errors'];
+        const nextErr = {};
         Object.entries(data).forEach(([key, value]) => {
-          fieldErrors[key] = Array.isArray(value) ? value[0] : String(value);
+          if (nonFieldKeys.includes(key)) {
+            nextErr[key] = Array.isArray(value) ? value.join(' ') : String(value);
+          } else {
+            nextErr[key] = Array.isArray(value) ? value[0] : String(value);
+          }
         });
-        setErr(fieldErrors);
+        setErr(nextErr);
       } else {
         toast.error('Could not send the invite.');
       }
@@ -492,9 +501,9 @@ function InviteEditor({ onClose, onSaved }) {
       size="sm"
     >
       <form onSubmit={submit} className="space-y-4" noValidate>
-        {err.detail && (
+        {(err.detail || err.error || err.non_field_errors) && (
           <div className="rounded-sm border border-cinnabar-200 bg-cinnabar-50 px-3 py-2 text-sm text-cinnabar-700">
-            {err.detail}
+            {err.detail || err.error || err.non_field_errors}
           </div>
         )}
         <Input

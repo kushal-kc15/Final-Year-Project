@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileImage, Loader2, ScanText, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import api from '../lib/api.js';
 import Button from './Button.jsx';
@@ -32,8 +32,10 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
   const [form, setForm] = useState({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const cancelledRef = useRef(false);
 
   useEffect(() => () => {
+    cancelledRef.current = true;
     if (preview) URL.revokeObjectURL(preview);
   }, [preview]);
 
@@ -47,6 +49,7 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
   };
 
   const close = () => {
+    cancelledRef.current = true;
     reset();
     onClose?.();
   };
@@ -80,8 +83,11 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
 
   const pollReceipt = async (id) => {
     for (let i = 0; i < 45; i += 1) {
+      if (cancelledRef.current) return;
       await wait(1500);
+      if (cancelledRef.current) return;
       const res = await api.get(`/receipts/${id}/`);
+      if (cancelledRef.current) return;
       hydrateForm(res.data);
       if (!PROCESSING.includes(res.data.status)) return res.data;
     }
@@ -93,6 +99,7 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
       setError('Choose a receipt image first.');
       return;
     }
+    cancelledRef.current = false;
     setBusy(true);
     setError('');
     const body = new FormData();
@@ -164,22 +171,23 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
       onClose={close}
       title="Scan receipt"
       description="Upload a receipt image, review the extracted fields, then create the expense."
-      size="xl"
+      size="2xl"
     >
-      <div className="grid gap-4 md:grid-cols-[0.9fr_1.1fr] md:gap-5">
+      <div className="grid gap-4 md:grid-cols-[0.85fr_1.15fr] md:gap-4">
         <div>
-          <label className="flex min-h-52 cursor-pointer flex-col items-center justify-center border border-dashed border-rule-strong bg-paper-deep px-4 py-6 text-center sm:min-h-72 sm:px-5 sm:py-8">
+          <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center border border-dashed border-rule-strong bg-paper-deep px-4 py-3.5 text-center sm:min-h-44 sm:px-5 sm:py-4">
             {preview ? (
-              <img src={preview} alt="Receipt preview" className="max-h-56 w-full object-contain sm:max-h-72" />
+              <img src={preview} alt="Receipt preview" className="max-h-40 w-full object-contain sm:max-h-48" />
             ) : (
               <>
-                <FileImage size={26} className="text-ink-muted" strokeWidth={1.5} />
-                <p className="mt-3 text-sm font-medium text-ink">Choose receipt image</p>
-                <p className="mt-1 text-xs text-ink-muted">JPG, PNG, or WebP</p>
+                <FileImage size={22} className="text-ink-muted" strokeWidth={1.5} />
+                <p className="mt-2.5 text-sm font-medium text-ink">Choose receipt image</p>
+                <p className="mt-0.5 text-xs text-ink-muted">JPG, PNG, or WebP</p>
               </>
             )}
             <input type="file" accept="image/*" className="hidden" onChange={pickFile} />
           </label>
+
             {error && (
             <div className="mt-3 flex gap-2 border border-cinnabar-200 bg-cinnabar-50 px-3 py-2 text-sm text-cinnabar-700">
               <AlertTriangle size={15} className="mt-0.5 shrink-0" />
@@ -196,17 +204,18 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
 
         <div>
           {!receipt ? (
-            <div className="h-full flex flex-col justify-between gap-5">
+            <div className="h-full flex flex-col gap-3">
               <div>
-                <h3 className="font-display text-2xl text-ink">Less typing, same control.</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                  OCR fills the vendor, amount, date, category, and notes. You still review before anything enters the book.
+                <h3 className="font-display text-lg text-ink">Less typing, same control.</h3>
+                <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">
+                  OCR fills the vendor, amount, date, category, and notes. Review before anything enters the book.
                 </p>
               </div>
-              <Button variant="primary" onClick={scan} disabled={busy || !file} iconRight={busy ? <Loader2 size={15} className="animate-spin" /> : <ScanText size={15} />}>
+              <Button variant="primary" onClick={scan} disabled={busy || !file} iconRight={busy ? <Loader2 size={15} className="animate-spin" /> : <ScanText size={15} />} className="self-start">
                 {busy ? 'Scanning...' : 'Scan receipt'}
               </Button>
             </div>
+
           ) : isProcessing ? (
             <div className="flex items-start gap-3 border border-rule bg-paper-deep p-4">
               <Loader2 size={18} className="mt-0.5 animate-spin text-ink-muted" />
