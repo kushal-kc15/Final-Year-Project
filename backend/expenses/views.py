@@ -3,7 +3,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db import transaction
 from django.db.models import Sum, Count, Q
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from datetime import timedelta
 from .models import Expense
@@ -31,13 +33,51 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         """
         user = self.request.user
         member = get_active_membership(user, self.request)
-        queryset = Expense.objects.select_related('user', 'organization')
+        queryset = Expense.objects.select_related('user', 'organization', 'receipt')
 
         if member and member.role == 'OWNER':
             return queryset.filter(organization=member.organization)
         if member:
             return queryset.filter(user=user, organization=member.organization)
         return queryset.filter(user=user)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+
+        with transaction.atomic():
+            queryset = self.filter_queryset(self.get_queryset()).select_for_update()
+            lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+            lookup_value = self.kwargs[lookup_url_kwarg]
+            expense = get_object_or_404(
+                queryset,
+                **{self.lookup_field: lookup_value}
+            )
+            self.check_object_permissions(request, expense)
+
+            if expense.user_id != request.user.id:
+                return Response(
+                    {'error': 'Only the submitter can edit this expense.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            if expense.status != 'PENDING':
+                return Response(
+                    {'error': 'Only pending expenses can be edited.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            serializer = self.get_serializer(
+                expense,
+                data=request.data,
+                partial=partial
+            )
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+
+            if getattr(expense, '_prefetched_objects_cache', None):
+                expense._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
     
     def perform_create(self, serializer):
         user = self.request.user
@@ -121,9 +161,13 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         if member and member.role == 'OWNER':
             base_filter = Q(organization=member.organization, status='APPROVED')
         elif member:
-            base_filter = Q(user=user, organization=member.organization)
+            base_filter = Q(
+                user=user,
+                organization=member.organization,
+                status='APPROVED',
+            )
         else:
-            base_filter = Q(user=user)
+            base_filter = Q(user=user, status='APPROVED')
         
         # Today's metrics
         today_expenses = Expense.objects.filter(
@@ -276,123 +320,102 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(pending_expenses, many=True)
         return Response(serializer.data)
+
+    def _decide_expense(self, request, pk, decision):
+        user = request.user
+        approving = decision == 'APPROVED'
+        action_label = 'approve' if approving else 'reject'
+
+        with transaction.atomic():
+            member = get_active_membership(user, request)
+            if not member or member.role != 'OWNER':
+                return Response(
+                    {'error': f'Only owners can {action_label} expenses'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            try:
+                expense = self.get_queryset().select_for_update().get(pk=pk)
+            except Expense.DoesNotExist:
+                return Response(
+                    {'error': 'Expense not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            if expense.user_id == user.id:
+                return Response(
+                    {'error': f'You cannot {action_label} your own expenses'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            if expense.status != 'PENDING':
+                return Response(
+                    {'error': f'Only pending expenses can be {decision.lower()}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            expense.status = decision
+
+            now = timezone.now()
+            if approving:
+                expense.reviewed_by = user
+                expense.reviewed_at = now
+                expense.rejection_reason = ''
+            else:
+                rejection_reason = (request.data.get('reason', '') or '').strip()
+                expense.reviewed_by = user
+                expense.reviewed_at = now
+                expense.rejection_reason = rejection_reason
+
+            expense.save(
+                update_fields=[
+                    'status',
+                    'updated_at',
+                    'reviewed_by',
+                    'reviewed_at',
+                    'rejection_reason',
+                ]
+            )
+
+            if approving:
+                self.check_budgets_for_expense(expense)
+                notify_expense_approved(expense, user)
+                metadata = {'expense_id': expense.id, 'approved_by': user.id}
+                action_type = 'EXPENSE_APPROVED'
+            else:
+                notify_expense_rejected(expense, user, expense.rejection_reason)
+                metadata = {
+                    'expense_id': expense.id,
+                    'rejected_by': user.id,
+                    'reason': expense.rejection_reason,
+                }
+                action_type = 'EXPENSE_REJECTED'
+
+            log_activity(
+                organization=member.organization,
+                user=user,
+                action_type=action_type,
+                description=(
+                    f"{user.get_full_name()} {decision.lower()} expense: "
+                    f"{expense.title} (रू {expense.amount}) by "
+                    f"{expense.user.get_full_name()}"
+                ),
+                metadata=metadata
+            )
+
+            serializer = self.get_serializer(expense)
+            return Response(serializer.data)
     
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         """Approve a pending expense (OWNER only)"""
-        user = request.user
-        
-        member = get_active_membership(user, request)
+        return self._decide_expense(request, pk, 'APPROVED')
 
-        if not member or member.role != 'OWNER':
-            return Response(
-                {'error': 'Only owners can approve expenses'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # Get expense from organization (not filtered by user)
-        try:
-            expense = Expense.objects.select_related('user', 'organization').get(pk=pk, organization=member.organization)
-        except Expense.DoesNotExist:
-            return Response(
-                {'error': 'Expense not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Prevent self-approval
-        if expense.user == user:
-            return Response(
-                {'error': 'You cannot approve your own expenses'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Check if expense is pending
-        if expense.status != 'PENDING':
-            return Response(
-                {'error': 'Only pending expenses can be approved'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Approve the expense
-        expense.status = 'APPROVED'
-        expense.save()
-        
-        # Check budgets after approval
-        self.check_budgets_for_expense(expense)
-        
-        # Notify expense owner
-        notify_expense_approved(expense, user)
-        
-        # Log activity
-        log_activity(
-            organization=member.organization,
-            user=user,
-            action_type='EXPENSE_APPROVED',
-            description=f"{user.get_full_name()} approved expense: {expense.title} (रू {expense.amount}) by {expense.user.get_full_name()}",
-            metadata={'expense_id': expense.id, 'approved_by': user.id}
-        )
-        
-        serializer = self.get_serializer(expense)
-        return Response(serializer.data)
-    
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         """Reject a pending expense with reason (OWNER only)"""
-        user = request.user
-        rejection_reason = request.data.get('reason', '')
-        
-        member = get_active_membership(user, request)
+        return self._decide_expense(request, pk, 'REJECTED')
 
-        if not member or member.role != 'OWNER':
-            return Response(
-                {'error': 'Only owners can reject expenses'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # Get expense from organization (not filtered by user)
-        try:
-            expense = Expense.objects.select_related('user', 'organization').get(pk=pk, organization=member.organization)
-        except Expense.DoesNotExist:
-            return Response(
-                {'error': 'Expense not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Prevent self-rejection
-        if expense.user == user:
-            return Response(
-                {'error': 'You cannot reject your own expenses'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Check if expense is pending
-        if expense.status != 'PENDING':
-            return Response(
-                {'error': 'Only pending expenses can be rejected'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Reject the expense
-        expense.status = 'REJECTED'
-        # Note: We'll add rejection_reason field to model later if needed
-        # For now, just change status
-        expense.save()
-        
-        # Notify expense owner
-        notify_expense_rejected(expense, user, rejection_reason)
-        
-        # Log activity
-        log_activity(
-            organization=member.organization,
-            user=user,
-            action_type='EXPENSE_REJECTED',
-            description=f"{user.get_full_name()} rejected expense: {expense.title} (रू {expense.amount}) by {expense.user.get_full_name()}",
-            metadata={'expense_id': expense.id, 'rejected_by': user.id, 'reason': rejection_reason}
-        )
-        
-        serializer = self.get_serializer(expense)
-        return Response(serializer.data)
-    
     @action(detail=False, methods=['get'])
     def vendor_analytics(self, request):
         """Get vendor spending analytics"""
