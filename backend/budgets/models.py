@@ -3,6 +3,8 @@ from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 
+from expenses.categories import BUDGET_CATEGORY_CHOICES
+
 
 class Budget(models.Model):
     """
@@ -14,18 +16,8 @@ class Budget(models.Model):
         ('MONTHLY', 'Monthly'),
         ('YEARLY', 'Yearly'),
     ]
-    
-    CATEGORY_CHOICES = [
-        ('ALL', 'All Categories'),
-        ('FOOD', 'Food & Dining'),
-        ('TRANSPORT', 'Transportation'),
-        ('OFFICE', 'Office Supplies'),
-        ('UTILITIES', 'Utilities'),
-        ('SALARY', 'Salary & Wages'),
-        ('RENT', 'Rent'),
-        ('MARKETING', 'Marketing'),
-        ('OTHER', 'Other'),
-    ]
+
+    CATEGORY_CHOICES = BUDGET_CATEGORY_CHOICES
     
     organization = models.ForeignKey(
         'organizations.Organization',

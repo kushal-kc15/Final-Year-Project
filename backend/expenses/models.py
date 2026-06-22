@@ -3,6 +3,8 @@ from django.conf import settings
 from django.core.validators import MinValueValidator
 from decimal import Decimal
 
+from .categories import REAL_EXPENSE_CATEGORY_CHOICES
+
 
 class Expense(models.Model):
     """
@@ -13,17 +15,9 @@ class Expense(models.Model):
         ('APPROVED', 'Approved'),
         ('REJECTED', 'Rejected'),
     ]
-    
-    CATEGORY_CHOICES = [
-        ('FOOD', 'Food & Dining'),
-        ('TRANSPORT', 'Transportation'),
-        ('OFFICE', 'Office Supplies'),
-        ('UTILITIES', 'Utilities'),
-        ('SALARY', 'Salary & Wages'),
-        ('RENT', 'Rent'),
-        ('MARKETING', 'Marketing'),
-        ('OTHER', 'Other'),
-    ]
+
+    # Expense categories are real expense categories only (NO 'ALL').
+    CATEGORY_CHOICES = REAL_EXPENSE_CATEGORY_CHOICES
     
     organization = models.ForeignKey(
         'organizations.Organization',
@@ -47,6 +41,18 @@ class Expense(models.Model):
     vendor = models.CharField(max_length=255, blank=True, null=True)
     date = models.DateField()
     description = models.TextField(blank=True)
+
+    # Decision metadata (approved/rejected by an owner)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_expenses',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, default="")
+
     status = models.CharField(
         max_length=10,
         choices=STATUS_CHOICES,

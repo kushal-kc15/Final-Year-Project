@@ -16,16 +16,8 @@ from PIL import Image, UnidentifiedImageError
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_CATEGORIES = {
-    'FOOD',
-    'TRANSPORT',
-    'OFFICE',
-    'UTILITIES',
-    'SALARY',
-    'RENT',
-    'MARKETING',
-    'OTHER',
-}
+from expenses.categories import OCR_CATEGORY_ALIASES, REAL_EXPENSE_CATEGORY_CODES
+
 
 IMAGE_MEDIA_TYPES = {
     'JPEG': 'image/jpeg',
@@ -40,6 +32,7 @@ NVIDIA_DEFAULT_MODEL = 'nvidia/nemotron-nano-12b-v2-vl'
 TRANSIENT_HTTP_STATUSES = {429, 500, 502, 503, 504}
 
 RECEIPT_EXTRACTION_PROMPT = """Extract receipt data from this image.
+
 
 Return only valid JSON. No markdown. No explanation.
 
@@ -303,6 +296,9 @@ class OCRProcessor:
         return None
 
     def _normalize_receipt_data(self, data):
+        # Defensive: OCR responses should be dict-like.
+        if not isinstance(data, dict):
+            raise OCRProviderError('OCR output is not a JSON object.')
         if not data.get('is_receipt', True):
             raise OCRProviderError('No receipt data found. The uploaded image does not appear to be a receipt, invoice, or bill.')
 
@@ -319,10 +315,45 @@ class OCRProcessor:
         if date_warning:
             warnings.append(date_warning)
 
-        category = str(data.get('category') or 'OTHER').upper()
-        if category not in ALLOWED_CATEGORIES:
-            warnings.append('unsupported_category_normalized')
-            category = 'OTHER'
+        category_raw = str(data.get('category') or 'OTHER').strip()
+        category_normalized = category_raw.upper()
+
+        # First try: if model already returned one of the allowed codes.
+        if category_normalized in REAL_EXPENSE_CATEGORY_CODES:
+            category = category_normalized
+        else:
+            # Second try: map common human labels/phrases to allowed codes.
+            # OCR may return phrases like "Food & Dining" which won't match exact alias keys.
+            category_key_raw = category_raw.lower().strip()
+
+            def _normalize_alias_text(text: str) -> str:
+                # Keep spaces, and treat '&' as space so "food & dining" -> "food dining"
+                text = text.replace('&', ' ')
+                # Collapse whitespace
+                text = re.sub(r'\s+', ' ', text).strip()
+                return text
+
+            category_key_norm = _normalize_alias_text(category_key_raw) or ''
+
+            mapped = OCR_CATEGORY_ALIASES.get(category_key_norm) if category_key_norm else None
+
+            # If still not matched, do substring matching against known alias keys.
+            if mapped not in REAL_EXPENSE_CATEGORY_CODES:
+                for alias_key, alias_mapped_code in OCR_CATEGORY_ALIASES.items():
+                    if alias_mapped_code not in REAL_EXPENSE_CATEGORY_CODES:
+                        continue
+                    alias_key_norm = _normalize_alias_text(alias_key)
+                    # exact containment matches words/phrases (e.g., "food dining" contains "food")
+                    if alias_key_norm and (alias_key_norm in category_key_norm or category_key_norm in alias_key_norm):
+                        mapped = alias_mapped_code
+                        break
+
+            if mapped in REAL_EXPENSE_CATEGORY_CODES:
+                category = mapped
+            else:
+                warnings.append('unsupported_category_normalized')
+                category = 'OTHER'
+
 
         line_items = self._normalize_line_items(data.get('line_items'))
         if not isinstance(line_items, list):
@@ -353,7 +384,20 @@ class OCRProcessor:
         if value in {None, ''}:
             return None
         try:
-            amount = Decimal(str(value).replace(',', '').strip())
+            # Normalize common receipt formats:
+            # - currency symbols (Rs., ₹, $, €)
+            # - thousand separators
+            # - "1,250/-" style
+            # - "Total: 1,250.00" style
+            cleaned = str(value)
+            cleaned = cleaned.replace(',', '')
+            cleaned = re.sub(r'(?i)\b(rs|npr|inr|eur|usd|\$|€|₹)\.?\b', '', cleaned)
+            cleaned = re.sub(r'(?i)\btotal\b\s*:?\s*', '', cleaned)
+            cleaned = cleaned.replace('/-', '')
+            cleaned = cleaned.strip()
+            # Keep only one leading sign (if any) and digits/decimal separators.
+            cleaned = re.sub(r'[^0-9.\-]', '', cleaned)
+            amount = Decimal(cleaned.strip())
         except (InvalidOperation, ValueError):
             return None
         return amount if amount > 0 else None

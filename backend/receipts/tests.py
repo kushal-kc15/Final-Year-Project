@@ -293,6 +293,148 @@ class NVIDIAOCRProcessorTestCase(TestCase):
         self.addCleanup(lambda: os.path.exists(image_file.name) and os.remove(image_file.name))
         return image_file.name
 
+    def _run_ocr_with_category(self, category_label: str):
+        image_path = self.create_test_image()
+
+        class FakeResponse:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    'choices': [
+                        {
+                            'message': {
+                                'content': f'''
+                                {{
+                                    "is_receipt": true,
+                                    "vendor_name": "Test Vendor",
+                                    "total_amount": "1250",
+                                    "receipt_date": "2026-06-11",
+                                    "category": "{category_label}",
+                                    "description": "",
+                                    "line_items": [],
+                                    "warnings": []
+                                }}
+                                '''
+                            },
+                        }
+                    ]
+                }
+
+        with patch.dict(
+            'os.environ',
+            {
+                'OCR_PROVIDER': 'nvidia',
+                'NVIDIA_API_KEY': 'test-key',
+            },
+            clear=False,
+        ):
+            with patch('receipts.ocr_processor.requests.post', return_value=FakeResponse()):
+                return OCRProcessor(image_path).process()
+
+    def test_category_aliases_map_human_labels_to_allowed_codes(self):
+        result = self._run_ocr_with_category('Food & Dining')
+        self.assertEqual(result['category'], 'FOOD')
+
+    def test_category_aliases_map_travel_hotel_lodging_accommodation_to_travel(self):
+        result = self._run_ocr_with_category('Hotel / Lodging / Accommodation')
+        self.assertEqual(result['category'], 'TRAVEL')
+
+    def test_category_aliases_unknown_still_maps_to_other(self):
+        result = self._run_ocr_with_category('UNSUPPORTED')
+        self.assertEqual(result['category'], 'OTHER')
+
+    def test_amount_parsing_handles_currency_symbols_and_commas(self):
+        image_path = self.create_test_image()
+
+        class FakeResponse:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    'choices': [
+                        {
+                            'message': {
+                                'content': '''
+                                {
+                                    "is_receipt": true,
+                                    "vendor_name": "Shop",
+                                    "total_amount": "₹1,250.50",
+                                    "receipt_date": "2026-06-11",
+                                    "category": "TRANSPORT",
+                                    "description": "",
+                                    "line_items": [],
+                                    "warnings": []
+                                }
+                                '''
+                            },
+                        }
+                    ]
+                }
+
+        with patch.dict(
+            'os.environ',
+            {
+                'OCR_PROVIDER': 'nvidia',
+                'NVIDIA_API_KEY': 'test-key',
+            },
+            clear=False,
+        ):
+            with patch('receipts.ocr_processor.requests.post', return_value=FakeResponse()):
+                result = OCRProcessor(image_path).process()
+
+        self.assertEqual(str(result['total_amount']), '1250.50')
+
+    def test_amount_parsing_rejects_invalid_numbers(self):
+        image_path = self.create_test_image()
+
+        class FakeResponse:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    'choices': [
+                        {
+                            'message': {
+                                'content': '''
+                                {
+                                    "is_receipt": true,
+                                    "vendor_name": "Shop",
+                                    "total_amount": "not-a-number",
+                                    "receipt_date": "2026-06-11",
+                                    "category": "TRANSPORT",
+                                    "description": "",
+                                    "line_items": [],
+                                    "warnings": []
+                                }
+                                '''
+                            },
+                        }
+                    ]
+                }
+
+        with patch.dict(
+            'os.environ',
+            {
+                'OCR_PROVIDER': 'nvidia',
+                'NVIDIA_API_KEY': 'test-key',
+            },
+            clear=False,
+        ):
+            with patch('receipts.ocr_processor.requests.post', return_value=FakeResponse()):
+                result = OCRProcessor(image_path).process()
+
+        self.assertIsNone(result['total_amount'])
+
     def test_process_sends_openai_vision_payload_and_normalizes_response(self):
         image_path = self.create_test_image()
 
