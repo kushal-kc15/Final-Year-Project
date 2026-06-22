@@ -85,6 +85,78 @@ export default {
           strong: '#cbc3b1',
         },
         canvas: '#fbfaf7',
+
+        // ---- Landing palette (additive; existing tokens untouched) ----
+        // Warm ivory page bg with a touch more amber than generic cream.
+        ivory: {
+          DEFAULT: '#F7F1E1',
+          soft:    '#F2EAD3',
+          deep:    '#EADFC2',
+        },
+        // Charcoal — slightly warmer than ink, used for the landing type.
+        charcoal: {
+          DEFAULT: '#2A241D',
+          soft:    '#4A4239',
+          muted:   '#7C7060',
+          faint:   '#A89D8B',
+        },
+        // Coral — primary CTA. Real terracotta family, not the AI pastel-coral.
+        coral: {
+          50:  '#FCEBE7',
+          100: '#F8D2C8',
+          200: '#F0AE9C',
+          500: '#E26B4D',
+          600: '#C95940',
+          700: '#A8472F',
+        },
+        // Forest — success / approved accents.
+        forest: {
+          50:  '#E6F0EA',
+          100: '#C9DDD0',
+          200: '#A4C7AE',
+          500: '#3F7259',
+          600: '#345E48',
+          700: '#284A39',
+        },
+        // Teal — secondary success / report accent.
+        teal: {
+          50:  '#DBEEEC',
+          100: '#B6DAD6',
+          200: '#84C2BC',
+          500: '#2E8078',
+          600: '#266963',
+          700: '#1D524D',
+        },
+        // Amber — pending / budget warning accents.
+        amber: {
+          50:  '#FAEBD2',
+          100: '#F2D3A4',
+          200: '#E5B470',
+          500: '#D88A41',
+          600: '#BA6F2D',
+          700: '#8E5520',
+        },
+        // Sage / mint / peach — soft visual panels behind content.
+        sage: {
+          50:  '#EBF1E7',
+          100: '#D6E2CC',
+          200: '#B8CFA9',
+        },
+        mint: {
+          50:  '#E2EFE9',
+          100: '#C5DDD5',
+          200: '#9BC8BB',
+        },
+        peach: {
+          50:  '#FAE6D5',
+          100: '#F2CFAE',
+          200: '#E8B081',
+        },
+        // Warm subtle borders for white cards on tinted panels.
+        warmborder: {
+          DEFAULT: '#EBE0C5',
+          strong:  '#D8C9A2',
+        },
       },
       borderRadius: {
         sm: '0.375rem',

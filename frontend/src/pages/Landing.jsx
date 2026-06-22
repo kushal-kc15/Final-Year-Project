@@ -116,6 +116,14 @@ function Nav() {
         <Link to="/" aria-label="Vyapar Margadarshan home" className="shrink-0">
           <Logo size={28} withWordmark wordmarkSize="lg" />
         </Link>
+
+        <nav className="hidden md:flex items-center gap-6 text-sm text-ink-soft">
+          <a href="#features" className="hover:text-ink transition-colors">Features</a>
+          <a href="#pricing" className="hover:text-ink transition-colors">Pricing</a>
+          <a href="#testimonials" className="hover:text-ink transition-colors">Reviews</a>
+          <a href="#faq" className="hover:text-ink transition-colors">FAQ</a>
+        </nav>
+
         <nav className="flex items-center gap-2">
           <Link
             to="/login"
@@ -161,11 +169,9 @@ function Hero() {
               in a small business.
             </h1>
 
-            <p className="mt-7 max-w-[58ch] text-lg text-ink-soft leading-[1.55] text-pretty">
-              Vyapar Margadarshan replaces the spreadsheet with a working ledger — every
-              rupee, every receipt, every approval, on a single page. NPR by
-              default; INR, USD and EUR supported. Built for the way Nepali
-              teams actually count, not the way Silicon Valley does.
+            <p className="mt-7 max-w-[54ch] text-lg text-ink-soft leading-[1.55] text-pretty">
+              Vyapar Margadarshan replaces scattered receipts and spreadsheets with a working ledger —
+              every rupee, every receipt, every approval, on one clean page.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -252,64 +258,9 @@ function Hero() {
   );
 }
 
-/* The typographic premise. Magazine-spread, not a feature grid. */
-function Premise() {
-  return (
-    <section className="border-b border-rule">
-      <div className="mx-auto max-w-[1240px] px-6 sm:px-10 py-16 sm:py-24">
-        <div className="grid grid-cols-12 gap-x-6 gap-y-8">
-          <div className="col-span-12 lg:col-span-5">
-            <h2 className="font-display font-medium text-3xl sm:text-4xl lg:text-5xl leading-[1.05] tracking-[-0.025em] text-ink text-balance">
-              Most small-business software is a small business{' '}
-              <em className="not-italic text-cinnabar-600">disguised</em>{' '}
-              as a phone.
-            </h2>
-          </div>
-          <div className="col-span-12 lg:col-span-6 lg:col-start-7 space-y-5 text-ink-soft text-base leading-[1.65] text-pretty">
-            <p>
-              Vyapar Margadarshan is the opposite. It is a ledger first, software second.
-              Every screen you open is a column in a page that you have been
-              keeping your whole working life — a ledger, ruled by date,
-              totaled in red ink at the bottom of the day.
-            </p>
-            <p>
-              When your employee files a reimbursement with a receipt photo,
-              it is a line in your book, with the cinnabar total at the foot
-              of the page. When your marketing budget is half-spent by the
-              9th, the rule thickens on the right-hand side so you know
-              before it breaks.
-            </p>
-            <ul className="pt-3 space-y-2.5 border-t border-rule">
-              {[
-                'A day book, in the currency your shop actually uses — NPR, INR, USD, EUR.',
-                'Receipts that look like receipts, not file uploads with a thumbnail.',
-                'Approvals and reimbursements built for one or two taps on a phone.',
-                'A team of one or a team of twenty — the same workspace, different roles.',
-              ].map((line) => (
-                <li key={line} className="flex items-start gap-3 text-ink-soft">
-                  <Check
-                    size={15}
-                    strokeWidth={1.75}
-                    className="mt-1 text-cinnabar-500 shrink-0"
-                    aria-hidden
-                  />
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* The four working instruments. Each is a real product surface, not a
-   feature card with icon + label. They share a column rhythm but never
-   the same shape. */
 function Instruments() {
   return (
-    <section className="border-b border-rule bg-paper-deep/40">
+    <section id="features" className="border-b border-rule bg-paper-deep/40">
       <div className="mx-auto max-w-[1240px] px-6 sm:px-10 py-16 sm:py-24">
         <div className="grid grid-cols-12 gap-x-6 gap-y-6 items-end mb-10 sm:mb-14">
           <div className="col-span-12 lg:col-span-7">
@@ -511,49 +462,184 @@ function Instruments() {
   );
 }
 
-/* "The numbers, in plain text." A typographic stat row — no card grid,
-   no fake numbers. Just the product's honest value props. */
-function Numbers() {
-  const items = [
-    { value: '4',  label: 'Currencies',     sub: 'NPR · INR · USD · EUR' },
-    { value: '1',  label: 'Ledger',         sub: 'One page, every rupee.' },
-    { value: '0',  label: 'Spreadsheets',   sub: 'The book replaces them.' },
-  ];
+
+/* Pricing, reviews and FAQ are kept restrained so the landing still feels like
+   a product page, not a generic SaaS brochure. */
+const PLANS = [
+  {
+    name: 'Starter',
+    price: 'Free demo',
+    note: 'For a single workspace and project review.',
+    features: ['Staff submissions', 'Receipt attachment', 'Owner approval queue', 'Basic report preview'],
+  },
+  {
+    name: 'Business',
+    price: 'Team',
+    note: 'For small teams that handle expenses every week.',
+    features: ['Receipt OCR', 'Budget tracking', 'CSV exports', 'Workspace roles'],
+    featured: true,
+  },
+  {
+    name: 'Institution',
+    price: 'Custom',
+    note: 'For demos, training, and larger organization workflows.',
+    features: ['Team management', 'Advanced reports', 'Budget monitoring', 'Setup support'],
+  },
+];
+
+function Pricing() {
   return (
-    <section className="border-b border-rule">
+    <section id="pricing" className="border-b border-rule bg-paper">
       <div className="mx-auto max-w-[1240px] px-6 sm:px-10 py-16 sm:py-20">
-        <div className="grid grid-cols-12 gap-x-6 gap-y-10">
-          <div className="col-span-12 md:col-span-4">
-            <h2 className="font-display font-medium text-2xl sm:text-3xl leading-[1.1] tracking-[-0.025em] text-ink text-balance">
-              The numbers,
-              <br />
-              <span className="text-ink-muted">in plain text.</span>
+        <div className="grid grid-cols-12 gap-x-6 gap-y-8 mb-9">
+          <div className="col-span-12 lg:col-span-5">
+            <h2 className="font-display font-medium text-3xl sm:text-4xl leading-[1.05] tracking-[-0.025em] text-ink text-balance">
+              Simple plans for a simple book.
             </h2>
           </div>
-          <div className="col-span-12 md:col-span-8">
-            <dl className="grid grid-cols-1 sm:grid-cols-3 border-t border-rule">
-              {items.map((it) => (
-                <div
-                  key={it.label}
-                  className="border-b border-rule sm:border-b-0 sm:border-r sm:last:border-r-0 py-5 sm:py-0 sm:px-6 first:sm:pl-0 last:sm:pr-0"
-                >
-                  <dt className="font-display text-5xl sm:text-6xl font-medium tracking-[-0.035em] text-ink leading-none num">
-                    {it.value}
-                  </dt>
-                  <dd className="mt-3">
-                    <p className="text-sm text-ink font-medium">{it.label}</p>
-                    <p className="text-xs text-ink-muted mt-0.5">{it.sub}</p>
-                  </dd>
+          <p className="col-span-12 lg:col-span-6 lg:col-start-7 text-ink-soft leading-relaxed max-w-[62ch]">
+            No enterprise theatre. Start with a workspace, add people when the workflow makes sense, and keep the ledger clean.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {PLANS.map((plan) => (
+            <article
+              key={plan.name}
+              className={`border rounded-md p-5 ${
+                plan.featured
+                  ? 'bg-ink text-paper border-ink shadow-page'
+                  : 'bg-paper border-rule shadow-xs'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-rule pb-4">
+                <div>
+                  <h3 className={`font-display text-xl ${plan.featured ? 'text-paper' : 'text-ink'}`}>{plan.name}</h3>
+                  <p className={`mt-1 text-xs ${plan.featured ? 'text-paper/70' : 'text-ink-muted'}`}>{plan.note}</p>
                 </div>
-              ))}
-            </dl>
-          </div>
+                <span className={`ribbon shrink-0 ${plan.featured ? 'bg-cinnabar-500 text-paper' : 'bg-paper-deep text-ink-soft'}`}>
+                  {plan.price}
+                </span>
+              </div>
+
+              <ul className="mt-4 space-y-2.5">
+                {plan.features.map((feature) => (
+                  <li key={feature} className={`flex items-start gap-2.5 text-sm ${plan.featured ? 'text-paper/90' : 'text-ink-soft'}`}>
+                    <Check size={14} className={plan.featured ? 'mt-0.5 text-cinnabar-300 shrink-0' : 'mt-0.5 text-cinnabar-500 shrink-0'} aria-hidden />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <Link
+                to={plan.name === 'Institution' ? '/login' : '/register'}
+                className={`mt-6 inline-flex h-10 w-full items-center justify-center rounded-sm border text-sm font-medium transition-colors ${
+                  plan.featured
+                    ? 'bg-paper text-ink border-paper hover:bg-paper-deep'
+                    : 'bg-cinnabar-500 text-paper border-cinnabar-500 hover:bg-cinnabar-600 hover:border-cinnabar-600'
+                }`}
+              >
+                {plan.name === 'Institution' ? 'Discuss setup' : 'Create account'}
+              </Link>
+            </article>
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
+const TESTIMONIALS = [
+  {
+    quote: 'The approval queue made pending staff expenses clear without opening a spreadsheet.',
+    name: 'Suman Adhikari',
+    role: 'Store manager',
+  },
+  {
+    quote: 'Receipts stayed attached to the expense, so monthly review was less confusing.',
+    name: 'Anita Sharma',
+    role: 'Small business owner',
+  },
+  {
+    quote: 'The budget view helped us explain spending during the final project demonstration.',
+    name: 'Bishal Karki',
+    role: 'Project reviewer',
+  },
+];
+
+function Testimonials() {
+  return (
+    <section id="testimonials" className="border-b border-rule bg-paper-deep/35">
+      <div className="mx-auto max-w-[1240px] px-6 sm:px-10 py-16 sm:py-20">
+        <div className="grid grid-cols-12 gap-x-6 gap-y-8 mb-9">
+          <div className="col-span-12 lg:col-span-4">
+            <h2 className="font-display font-medium text-3xl sm:text-4xl leading-[1.05] tracking-[-0.025em] text-ink text-balance">
+              Notes from the counter.
+            </h2>
+          </div>
+          <p className="col-span-12 lg:col-span-7 lg:col-start-6 text-ink-soft leading-relaxed">
+            Short comments from the people who need the workflow to stay practical: submit, review, total, export.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {TESTIMONIALS.map((item) => (
+            <figure key={item.name} className="bg-paper border border-rule rounded-md p-5 shadow-xs">
+              <blockquote className="font-display text-xl leading-snug text-ink text-balance">
+                “{item.quote}”
+              </blockquote>
+              <figcaption className="mt-5 pt-4 border-t border-rule">
+                <p className="text-sm font-medium text-ink">{item.name}</p>
+                <p className="text-xs text-ink-muted mt-0.5">{item.role}</p>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const FAQS = [
+  ['Can staff submit expenses?', 'Yes. Staff can file an expense, attach the receipt, and follow whether it is pending, approved, or returned.'],
+  ['Can owners approve or return expenses?', 'Yes. Owners review staff expenses from a queue and can return an expense with a reason.'],
+  ['Does receipt scanning work?', 'Yes. Receipt OCR can fill common fields such as vendor, date, amount, and category before the expense is submitted.'],
+  ['Can reports be exported?', 'Yes. Approved expenses can be reviewed by period and exported as CSV.'],
+  ['Is it only for large companies?', 'No. The workflow is designed for small teams first, then scales to a larger workspace.'],
+];
+
+function FAQ() {
+  return (
+    <section id="faq" className="border-b border-rule bg-paper">
+      <div className="mx-auto max-w-[1240px] px-6 sm:px-10 py-16 sm:py-20">
+        <div className="grid grid-cols-12 gap-x-6 gap-y-8">
+          <div className="col-span-12 lg:col-span-4">
+            <h2 className="font-display font-medium text-3xl sm:text-4xl leading-[1.05] tracking-[-0.025em] text-ink text-balance">
+              Questions before opening the book.
+            </h2>
+            <p className="mt-4 text-sm leading-relaxed text-ink-muted max-w-sm">
+              Practical answers about submissions, approvals, receipt scanning, and reports.
+            </p>
+          </div>
+
+          <div className="col-span-12 lg:col-span-8">
+            <div className="border-t border-rule">
+              {FAQS.map(([question, answer]) => (
+                <details key={question} className="group border-b border-rule py-4">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-5 text-ink">
+                    <span className="font-medium">{question}</span>
+                    <span className="text-cinnabar-600 transition-transform group-open:rotate-45">+</span>
+                  </summary>
+                  <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-soft">{answer}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 /* The masthead / closer. Restrained. One sentence, one button. */
 function Closer() {
   return (
@@ -598,9 +684,10 @@ export default function Landing() {
       <Nav />
       <main>
         <Hero />
-        <Premise />
         <Instruments />
-        <Numbers />
+        <Pricing />
+        <Testimonials />
+        <FAQ />
         <Closer />
       </main>
       <Footer />
