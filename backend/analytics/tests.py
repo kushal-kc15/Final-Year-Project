@@ -1,3 +1,5 @@
+import csv
+import io
 from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
@@ -144,6 +146,120 @@ class AnalyticsEndpointTestCase(TestCase):
         self.assertEqual(len(response.data['vendors']), 1)
         self.assertEqual(response.data['vendors'][0]['vendor'], 'Cafe A')
         self.assertEqual(response.data['vendors'][0]['total'], 100.0)
+
+    def export_rows(self, user, query=''):
+        self.authenticate(user)
+        response = self.client.get(f'/api/analytics/export-csv/{query}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        content = response.content.decode('utf-8-sig')
+        return response, list(csv.reader(io.StringIO(content))), content
+
+    def test_export_csv_returns_business_report_sections(self):
+        response, rows, content = self.export_rows(self.owner)
+
+        self.assertEqual(response['Content-Type'], 'text/csv; charset=utf-8')
+        self.assertIn('attachment; filename="approved-expense-report_', response['Content-Disposition'])
+        self.assertEqual(rows[0], ['Vyapar Margadarshan Approved Expense Report'])
+        self.assertIn(['Data scope', 'Approved expenses only'], rows)
+        self.assertIn(['Category Breakdown'], rows)
+        self.assertIn(['Vendor Summary'], rows)
+        self.assertIn(['Spending Trend'], rows)
+        self.assertIn('Approved expenses only', content)
+
+    def test_owner_export_includes_only_organization_approved_expenses(self):
+        Expense.objects.create(
+            organization=self.organization,
+            user=self.staff,
+            title='Pending export expense',
+            amount=Decimal('45.00'),
+            category='OTHER',
+            vendor='Pending Vendor',
+            date=date.today(),
+            status='PENDING',
+        )
+        Expense.objects.create(
+            organization=self.organization,
+            user=self.staff,
+            title='Rejected expense',
+            amount=Decimal('35.00'),
+            category='OTHER',
+            vendor='Rejected Vendor',
+            date=date.today(),
+            status='REJECTED',
+        )
+
+        _, rows, content = self.export_rows(self.owner)
+
+        self.assertIn(['Approved amount', '150.00'], rows)
+        self.assertIn(['Total approved expenses', '2'], rows)
+        self.assertIn('Cafe A', content)
+        self.assertIn('Taxi Co', content)
+        self.assertNotIn('Pending Vendor', content)
+        self.assertNotIn('Rejected Vendor', content)
+        self.assertNotIn('Other Vendor', content)
+
+    def test_staff_export_contains_only_their_approved_expenses(self):
+        _, rows, content = self.export_rows(self.staff)
+
+        self.assertIn(['Approved amount', '50.00'], rows)
+        self.assertIn(['Total approved expenses', '1'], rows)
+        self.assertIn('Taxi Co', content)
+        self.assertNotIn('Cafe A', content)
+        self.assertNotIn('Other Vendor', content)
+
+    def test_export_csv_applies_date_range_and_period(self):
+        yesterday = date.today() - timedelta(days=1)
+        Expense.objects.create(
+            organization=self.organization,
+            user=self.owner,
+            title='Old approved expense',
+            amount=Decimal('70.00'),
+            category='OFFICE',
+            vendor='Old Vendor',
+            date=yesterday,
+            status='APPROVED',
+        )
+        today = date.today().isoformat()
+
+        _, rows, content = self.export_rows(
+            self.owner,
+            f'?start_date={today}&end_date={today}&period=monthly',
+        )
+
+        self.assertIn(['Date range', f'{today} to {today}'], rows)
+        self.assertIn(['Approved amount', '150.00'], rows)
+        self.assertNotIn('Old Vendor', content)
+        trend_header_index = rows.index(['Period', 'Period start', 'Total spend', 'Count'])
+        self.assertEqual(rows[trend_header_index + 1][0], date.today().strftime('%b %Y'))
+        self.assertEqual(rows[trend_header_index + 1][1], date.today().replace(day=1).isoformat())
+
+    def test_export_csv_protects_formula_like_text(self):
+        Expense.objects.create(
+            organization=self.organization,
+            user=self.owner,
+            title='Formula vendor expense',
+            amount=Decimal('10.00'),
+            category='OTHER',
+            vendor='=SUM(A1:A2)',
+            date=date.today(),
+            status='APPROVED',
+        )
+
+        _, rows, content = self.export_rows(self.owner)
+
+        self.assertIn(["'=SUM(A1:A2)", '1', '10.00'], rows)
+        self.assertNotIn('\n=SUM(A1:A2),', content)
+
+    def test_export_csv_validates_period_and_date_range(self):
+        self.authenticate(self.owner)
+
+        bad_period = self.client.get('/api/analytics/export-csv/?period=hourly')
+        bad_range = self.client.get(
+            '/api/analytics/export-csv/?start_date=2026-02-01&end_date=2026-01-01'
+        )
+
+        self.assertEqual(bad_period.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(bad_range.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_budget_burn_rate_returns_projection_data(self):
         self.authenticate(self.owner)

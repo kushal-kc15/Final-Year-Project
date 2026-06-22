@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('overview/', views.overview, name='analytics-overview'),
+    path('export-csv/', views.export_csv, name='analytics-export-csv'),
     path('spending-trends/', views.spending_trends, name='spending-trends'),
     path('category-breakdown/', views.category_breakdown, name='category-breakdown'),
     path('period-comparison/', views.period_comparison, name='period-comparison'),

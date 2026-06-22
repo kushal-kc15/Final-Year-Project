@@ -1,6 +1,8 @@
+import csv
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.http import HttpResponse
 from django.db.models import Avg, Count, Sum
 from django.db.models.functions import TruncDay, TruncMonth, TruncWeek
 from django.utils import timezone
@@ -34,6 +36,29 @@ def percent(numerator, denominator, precision=2):
     if denominator <= 0:
         return 0
     return round(float((numerator / denominator) * Decimal('100')), precision)
+
+
+def decimal_string(value):
+    return f"{Decimal(str(value or 0)):.2f}"
+
+
+def safe_csv_text(value):
+    text = '' if value is None else str(value)
+    if text.startswith(('=', '+', '-', '@')):
+        return f"'{text}"
+    return text
+
+
+def category_label(category):
+    return dict(Expense.CATEGORY_CHOICES).get(category, category or '')
+
+
+def report_period_label(period_start, period):
+    if not period_start:
+        return ''
+    if hasattr(period_start, 'date'):
+        period_start = period_start.date()
+    return period_start.strftime('%b %Y' if period == 'monthly' else '%b %d')
 
 
 def parse_date_param(request, name):
@@ -517,6 +542,122 @@ def spending_trends(request):
         'end_date': end_date,
         'trends': trends,
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_csv(request):
+    period = request.query_params.get('period', 'daily')
+    if period not in PERIOD_TRUNCATORS:
+        raise ValidationError({'period': 'Use daily, weekly, or monthly.'})
+
+    expenses, member = scoped_expenses(request)
+    expenses, start_date, end_date = apply_date_filters(expenses, request)
+    summary = expenses.aggregate(total=Sum('amount'), count=Count('id'))
+    total_amount = summary['total'] or Decimal('0')
+    total_count = summary['count'] or 0
+
+    category_rows = list(
+        expenses.values('category').annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('-total', 'category')
+    )
+    vendor_rows = list(
+        expenses.exclude(vendor__isnull=True).exclude(vendor='').values('vendor').annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('-total', 'vendor')
+    )
+
+    trunc_func = PERIOD_TRUNCATORS[period]
+    trend_rows = list(
+        expenses.annotate(period_bucket=trunc_func('date')).values('period_bucket').annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('period_bucket')
+    )
+
+    top_category = category_rows[0] if category_rows else None
+    top_vendor = vendor_rows[0] if vendor_rows else None
+    generated_at = timezone.localtime(timezone.now()).strftime('%Y-%m-%d %H:%M:%S %Z')
+    date_range = (
+        f'{start_date.isoformat() if start_date else "Beginning"} to '
+        f'{end_date.isoformat() if end_date else "Present"}'
+    )
+
+    filename_start = start_date.isoformat() if start_date else 'all'
+    filename_end = end_date.isoformat() if end_date else 'all'
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response.write('\ufeff')
+    response['Content-Disposition'] = (
+        f'attachment; filename="approved-expense-report_{filename_start}_{filename_end}.csv"'
+    )
+    writer = csv.writer(response)
+
+    writer.writerow(['Vyapar Margadarshan Approved Expense Report'])
+    writer.writerow([])
+    writer.writerow(['Report Summary'])
+    writer.writerow(['Organization', safe_csv_text(member.organization.name)])
+    writer.writerow(['Date range', date_range])
+    writer.writerow(['Generated at', generated_at])
+    writer.writerow(['Currency', request.user.default_currency])
+    writer.writerow(['Data scope', 'Approved expenses only'])
+    writer.writerow(['Approved amount', decimal_string(total_amount)])
+    writer.writerow(['Total approved expenses', total_count])
+    writer.writerow([
+        'Top category',
+        safe_csv_text(category_label(top_category['category'])) if top_category else 'Unavailable',
+    ])
+    writer.writerow([
+        'Top category amount',
+        decimal_string(top_category['total']) if top_category else '0.00',
+    ])
+    writer.writerow([
+        'Top vendor',
+        safe_csv_text(top_vendor['vendor']) if top_vendor else 'Unavailable',
+    ])
+    writer.writerow([
+        'Top vendor amount',
+        decimal_string(top_vendor['total']) if top_vendor else '0.00',
+    ])
+
+    writer.writerow([])
+    writer.writerow(['Category Breakdown'])
+    writer.writerow(['Category', 'Entries', 'Total spend', 'Share %'])
+    for row in category_rows:
+        writer.writerow([
+            safe_csv_text(category_label(row['category'])),
+            row['count'],
+            decimal_string(row['total']),
+            decimal_string(percent(row['total'], total_amount)),
+        ])
+
+    writer.writerow([])
+    writer.writerow(['Vendor Summary'])
+    writer.writerow(['Vendor', 'Entries', 'Total spend'])
+    for row in vendor_rows:
+        writer.writerow([
+            safe_csv_text(row['vendor']),
+            row['count'],
+            decimal_string(row['total']),
+        ])
+
+    writer.writerow([])
+    writer.writerow(['Spending Trend'])
+    writer.writerow(['Period', 'Period start', 'Total spend', 'Count'])
+    for row in trend_rows:
+        period_start = row['period_bucket']
+        if hasattr(period_start, 'date'):
+            period_start = period_start.date()
+        writer.writerow([
+            report_period_label(period_start, period),
+            period_start.isoformat() if period_start else '',
+            decimal_string(row['total']),
+            row['count'],
+        ])
+
+    return response
 
 
 @api_view(['GET'])
