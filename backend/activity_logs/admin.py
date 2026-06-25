@@ -9,11 +9,15 @@ class ActivityLogAdmin(admin.ModelAdmin):
     search_fields = ['description', 'user__username', 'user__email']
     readonly_fields = ['timestamp']
     ordering = ['-timestamp']
-    
+
     def has_add_permission(self, request):
         # Activity logs should only be created programmatically
         return False
-    
+
     def has_change_permission(self, request, obj=None):
         # Activity logs should not be edited
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Activity logs should not be deleted
         return False
