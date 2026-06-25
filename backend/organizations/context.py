@@ -132,6 +132,12 @@ def accept_invitation_for_user(user, token):
     except Invitation.DoesNotExist:
         raise ValidationError('Invalid invitation token')
 
+    if invitation.status == 'CANCELLED':
+        raise ValidationError('This invitation has been cancelled.')
+
+    if invitation.is_used:
+        raise ValidationError('Invitation is no longer valid')
+
     if invitation.status != 'PENDING':
         raise ValidationError('Invitation is no longer valid')
 
@@ -148,9 +154,6 @@ def accept_invitation_for_user(user, token):
         user=user,
     ).exists():
         raise ValidationError('You are already a member of this organization')
-
-    if OrganizationMember.objects.filter(user=user).exists():
-        raise ValidationError('You already belong to an organization for this MVP')
 
     member = OrganizationMember.objects.create(
         organization=invitation.organization,

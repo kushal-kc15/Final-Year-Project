@@ -49,14 +49,6 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             member_count_value=Count('members', distinct=True)
         ).distinct()
 
-    def create(self, request, *args, **kwargs):
-        if OrganizationMember.objects.filter(user=request.user).exists():
-            return Response(
-                {'error': 'You already belong to an organization for this MVP.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return super().create(request, *args, **kwargs)
-    
     def perform_create(self, serializer):
         organization = serializer.save()
         OrganizationMember.objects.create(
@@ -161,12 +153,6 @@ class OrganizationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if existing_user and OrganizationMember.objects.filter(user=existing_user).exists():
-            return Response(
-                {'error': 'This user already belongs to an organization for this MVP.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
         # Check for pending invitation
         pending_invitation = Invitation.objects.filter(
             organization=organization,
@@ -370,15 +356,23 @@ class InvitationViewSet(viewsets.ReadOnlyModelViewSet):
         return super().get_permissions()
     
     def get_queryset(self):
+        if self.request.user.is_staff or self.request.user.is_superuser:
+            return Invitation.objects.all().select_related('organization', 'invited_by')
+
+        if self.action in {'cancel', 'resend'}:
+            return Invitation.objects.filter(
+                organization__members__user=self.request.user,
+            ).select_related('organization', 'invited_by').distinct()
+
         # Return invitations for organizations where user is OWNER
         return Invitation.objects.filter(
             organization__members__user=self.request.user,
             organization__members__role='OWNER'
         ).select_related('organization', 'invited_by').distinct()
     
-    @action(detail=True, methods=['delete'])
+    @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
-        """Cancel a pending invitation"""
+        """Cancel a pending invitation while preserving history."""
         invitation = self.get_object()
         
         # Only allow canceling pending invitations
@@ -387,9 +381,15 @@ class InvitationViewSet(viewsets.ReadOnlyModelViewSet):
                 {'error': 'Can only cancel pending invitations'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        if invitation.is_used:
+            return Response(
+                {'error': 'Cannot cancel an accepted invitation'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
-        # Delete the invitation
-        invitation.delete()
+        invitation.status = 'CANCELLED'
+        invitation.save(update_fields=['status'])
         
         return Response(
             {'message': 'Invitation cancelled successfully'},
@@ -445,6 +445,33 @@ class InvitationViewSet(viewsets.ReadOnlyModelViewSet):
 
         serializer = InvitationSerializer(pending_invites, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='status')
+    def invitation_status(self, request):
+        """Return safe status information for an invitation token addressed to the current user."""
+        token = request.query_params.get('token')
+        if not token:
+            return Response({'error': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            invitation = Invitation.objects.select_related('organization', 'invited_by').get(token=token)
+        except Invitation.DoesNotExist:
+            return Response({'error': 'Invalid invitation token'}, status=status.HTTP_404_NOT_FOUND)
+
+        if invitation.email.lower() != request.user.email.lower():
+            return Response(
+                {'error': 'This invitation was sent to a different email address'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if invitation.status == 'PENDING' and invitation.expires_at < timezone.now():
+            invitation.status = 'EXPIRED'
+            invitation.save(update_fields=['status'])
+
+        serializer = InvitationSerializer(invitation)
+        response_data = serializer.data
+        response_data.pop('token', None)
+        return Response(response_data)
     
     @action(detail=False, methods=['post'])
     def accept(self, request):

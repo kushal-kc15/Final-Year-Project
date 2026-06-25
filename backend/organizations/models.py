@@ -31,10 +31,9 @@ class Organization(models.Model):
 
 class Membership(models.Model):
     """
-    Membership model linking one user to one organization for the MVP.
+    Membership model linking a user to an organization.
 
-    The single-user uniqueness constraint can be relaxed later for full
-    multi-tenancy without changing the rest of the relationship shape.
+    A user can belong to multiple organizations, with a different role in each.
     """
     ROLE_CHOICES = [
         ('OWNER', 'Owner'),
@@ -56,8 +55,10 @@ class Membership(models.Model):
     
     class Meta:
         db_table = 'organization_members'
-        unique_together = (('user',),)
         ordering = ['-joined_at']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'organization'], name='unique_user_organization_membership'),
+        ]
         indexes = [
             models.Index(fields=['organization', 'role'], name='mem_org_role_idx'),
         ]
@@ -78,6 +79,7 @@ class Invitation(models.Model):
         ('PENDING', 'Pending'),
         ('ACCEPTED', 'Accepted'),
         ('EXPIRED', 'Expired'),
+        ('CANCELLED', 'Cancelled'),
     ]
     
     organization = models.ForeignKey(
