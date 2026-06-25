@@ -11,6 +11,14 @@ import Button from "../components/Button.jsx";
 import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useToast } from "../components/Toast.jsx";
+import {
+  clearPendingInviteToken,
+  getInviteLoginPath,
+  getInviteRegisterPath,
+  storePendingInviteToken,
+} from "../lib/inviteFlow.js";
+
+const CANCELLED_INVITE_MESSAGE = "This invitation has been cancelled by the organization owner.";
 
 export default function AcceptInvite() {
   const { token } = useParams();
@@ -32,41 +40,47 @@ export default function AcceptInvite() {
       setError(
         "Open the invitation email again or ask your team to resend it.",
       );
-      return () => {
-        cancelled = true;
-      };
+      return;
     }
+
+    storePendingInviteToken(inviteToken);
 
     if (!user) {
       setState("form");
       setError("");
-      return () => {
-        cancelled = true;
-      };
+      return;
     }
 
     setState("loading");
     setError("");
     api
-      .get("/invitations/pending/")
+      .get(`/invitations/status/?token=${encodeURIComponent(inviteToken)}`)
       .then((r) => {
         if (cancelled) return;
-        const invitations = r.data?.results ?? r.data ?? [];
-        const invitation = invitations.find(
-          (i) => String(i.token) === String(inviteToken),
-        );
-        setInfo(invitation ?? null);
-        setState(invitation ? "form" : "error");
-        if (!invitation) {
+        const invitation = r.data;
+        setInfo(invitation);
+        if (String(invitation?.status ?? "").toUpperCase() === "CANCELLED") {
+          setState("error");
+          setError(CANCELLED_INVITE_MESSAGE);
+        } else if (String(invitation?.status ?? "").toUpperCase() === "PENDING") {
+          setState("form");
+        } else {
+          setState("error");
           setError(
             "This invitation may have been used, expired, or is not available for this account.",
           );
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
+        const msg = err?.response?.data?.error;
         setInfo(null);
-        setState("form");
+        setState("error");
+        setError(
+          msg === "This invitation has been cancelled."
+            ? CANCELLED_INVITE_MESSAGE
+            : msg || "This invitation may have been used, expired, or is not available for this account.",
+        );
       });
 
     return () => {
@@ -78,7 +92,7 @@ export default function AcceptInvite() {
     e.preventDefault();
 
     if (!user) {
-      navigate(`/register?invite=${encodeURIComponent(inviteToken)}`, {
+      navigate(getInviteRegisterPath(inviteToken), {
         replace: true,
       });
       return;
@@ -88,13 +102,19 @@ export default function AcceptInvite() {
     setError("");
 
     try {
-      await api.post("/invitations/accept/", { token: inviteToken });
+      const response = await api.post("/invitations/accept/", { token: inviteToken });
+      applyAuth(response.data);
       await refreshSession();
+      clearPendingInviteToken();
       toast.success("Welcome to the team.");
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      setError(err?.response?.data?.error || "Could not accept invite.");
-      toast.error(err?.response?.data?.error || "Could not accept invite.");
+      const backendMessage = err?.response?.data?.error;
+      const msg = backendMessage === "This invitation has been cancelled."
+        ? CANCELLED_INVITE_MESSAGE
+        : backendMessage || "Could not accept invite.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -112,18 +132,14 @@ export default function AcceptInvite() {
           {user && (
             <Link
               to="/dashboard"
-              className="hidden sm:inline-flex text-sm text-ink-soft hover:text-ink"
+              className="hidden sm:inline-flex text-sm text-ink-soft hover:text-ink transition-colors"
             >
               Back to dashboard
             </Link>
           )}
           <Link
-            to={
-              inviteToken
-                ? `/login?invite=${encodeURIComponent(inviteToken)}`
-                : "/login"
-            }
-            className="text-sm text-ink-soft hover:text-ink"
+            to={inviteToken ? getInviteLoginPath(inviteToken) : "/login"}
+            className="text-sm text-ink-soft hover:text-ink transition-colors"
           >
             Back to sign in
           </Link>
@@ -168,7 +184,7 @@ export default function AcceptInvite() {
                   as={Link}
                   to={
                     inviteToken
-                      ? `/login?invite=${encodeURIComponent(inviteToken)}`
+                      ? getInviteLoginPath(inviteToken)
                       : "/login"
                   }
                   variant="primary"
@@ -237,7 +253,7 @@ export default function AcceptInvite() {
                   {user ? (
                     <Link
                       to="/dashboard"
-                      className="text-sm text-ink-muted hover:text-ink"
+                      className="text-sm text-ink-muted hover:text-ink transition-colors"
                     >
                       Back to dashboard
                     </Link>
@@ -245,10 +261,10 @@ export default function AcceptInvite() {
                     <Link
                       to={
                         inviteToken
-                          ? `/login?invite=${encodeURIComponent(inviteToken)}`
+                          ? getInviteLoginPath(inviteToken)
                           : "/login"
                       }
-                      className="text-sm text-ink-muted hover:text-ink"
+                      className="text-sm text-ink-muted hover:text-ink transition-colors"
                     >
                       Back to sign in
                     </Link>

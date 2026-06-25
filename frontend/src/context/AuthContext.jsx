@@ -2,7 +2,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import api, { setAccessToken, setOnUnauthorized } from '../lib/api.js';
 
 const AuthContext = createContext(null);
-
 const STORAGE_KEY = 'bk.auth.v1';
 
 const readStored = () => {
@@ -22,31 +21,62 @@ const writeStored = (val) => {
 const responseValue = (data, key, fallback = null) =>
   Object.prototype.hasOwnProperty.call(data ?? {}, key) ? data[key] : fallback;
 
-/**
- * Translate a backend auth response into the shape our context stores.
- * Backend returns `{ access, refresh, user, active_organization, role, ... }`
- * but the context historically stores it as `{ user, organization, token, role, currency }`.
- */
+const normalizeMemberships = (memberships) => {
+  if (!Array.isArray(memberships)) return [];
+  return memberships
+    .map((membership) => {
+      const organization =
+        membership.organization && typeof membership.organization === 'object'
+          ? membership.organization
+          : {
+              id: membership.organization_id ?? membership.organization,
+              name: membership.organization_name ?? membership.name ?? 'Workspace',
+            };
+      if (!organization?.id) return null;
+      return {
+        ...membership,
+        organization,
+        organization_id: membership.organization_id ?? organization.id,
+        organization_name: membership.organization_name ?? organization.name,
+        role: membership.role ?? null,
+      };
+    })
+    .filter(Boolean);
+};
+
+const roleForOrganization = (memberships, organization) => {
+  if (!organization?.id) return null;
+  return memberships.find((membership) => String(membership.organization_id) === String(organization.id))?.role ?? null;
+};
+
+const organizationFromOnlyMembership = (memberships) =>
+  memberships.length === 1 ? memberships[0].organization : null;
+
 const normalizeAuthResponse = (data) => {
   if (!data) return null;
+  const memberships = normalizeMemberships(responseValue(data, 'memberships', []));
+  const organization = responseValue(data, 'active_organization') ?? organizationFromOnlyMembership(memberships);
   return {
     user: data.user ?? null,
-    organization: responseValue(data, 'active_organization'),
+    organization,
+    memberships,
     token: data.access ?? data.token ?? null,
-    role: responseValue(data, 'role', data.user?.role ?? null),
+    role: responseValue(data, 'role', roleForOrganization(memberships, organization) ?? data.user?.role ?? null),
   };
 };
 
 const normalizeMeResponse = (data, token) => {
   if (!data) return null;
+  const memberships = normalizeMemberships(responseValue(data, 'memberships', []));
   const organization = Object.prototype.hasOwnProperty.call(data, 'active_organization')
-    ? data.active_organization
+    ? data.active_organization ?? organizationFromOnlyMembership(memberships)
     : responseValue(data, 'organization');
   return {
     user: data,
     organization,
+    memberships,
     token,
-    role: responseValue(data, 'role'),
+    role: responseValue(data, 'role', roleForOrganization(memberships, organization)),
   };
 };
 
@@ -57,6 +87,7 @@ export function AuthProvider({ children }) {
     return {
       user: stored?.user ?? null,
       organization: stored?.organization ?? null,
+      memberships: normalizeMemberships(stored?.memberships ?? []),
       token: stored?.token ?? null,
       role: stored?.role ?? null,
       currency: stored?.currency ?? 'NPR',
@@ -67,16 +98,22 @@ export function AuthProvider({ children }) {
   const applyAuth = useCallback((payload) => {
     if (!payload) {
       setAccessToken(null);
-      setState((s) => ({ ...s, user: null, organization: null, token: null, role: null, loading: false }));
+      setState((s) => ({ ...s, user: null, organization: null, memberships: [], token: null, role: null, loading: false }));
       writeStored(null);
       return;
     }
     let next;
     setState((current) => {
       const user = Object.prototype.hasOwnProperty.call(payload, 'user') ? payload.user : current.user;
-      const organization = Object.prototype.hasOwnProperty.call(payload, 'organization')
+      const payloadOrganization = Object.prototype.hasOwnProperty.call(payload, 'organization')
         ? payload.organization
-        : current.organization;
+        : Object.prototype.hasOwnProperty.call(payload, 'active_organization')
+          ? payload.active_organization
+          : current.organization;
+      const memberships = Object.prototype.hasOwnProperty.call(payload, 'memberships')
+        ? normalizeMemberships(payload.memberships)
+        : current.memberships;
+      const organization = payloadOrganization ?? organizationFromOnlyMembership(memberships);
       const token = Object.prototype.hasOwnProperty.call(payload, 'token') ? payload.token : current.token;
       const role = Object.prototype.hasOwnProperty.call(payload, 'role') ? payload.role : current.role;
       const currency = Object.prototype.hasOwnProperty.call(payload, 'currency') ? payload.currency : current.currency;
@@ -85,12 +122,13 @@ export function AuthProvider({ children }) {
       next = {
         user,
         organization,
+        memberships,
         token,
-        role: role ?? user?.role ?? null,
+        role: role ?? roleForOrganization(memberships, organization) ?? user?.role ?? null,
         currency: currency ?? 'NPR',
         loading: false,
       };
-      writeStored({ user, organization, token, role: next.role, currency: next.currency });
+      writeStored({ user, organization, memberships, token, role: next.role, currency: next.currency });
       return next;
     });
     return next;
@@ -129,7 +167,6 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const res = await api.post('/auth/login/', { email, password });
     const data = res.data;
-    // The backend may signal a 2FA challenge instead of issuing tokens.
     if (data?.requires_2fa) {
       return data; // caller handles the 2FA branch
     }
@@ -206,8 +243,9 @@ export function AuthProvider({ children }) {
 
   const setOrganization = useCallback((organization) => {
     setState((s) => {
-      const next = { ...s, organization };
-      writeStored({ user: s.user, organization, token: s.token, role: s.role, currency: s.currency });
+      const role = roleForOrganization(s.memberships, organization) ?? s.role;
+      const next = { ...s, organization, role };
+      writeStored({ user: s.user, organization, memberships: s.memberships, token: s.token, role, currency: s.currency });
       return next;
     });
   }, []);
@@ -215,10 +253,23 @@ export function AuthProvider({ children }) {
   const setRole = useCallback((role) => {
     setState((s) => {
       const next = { ...s, role };
-      writeStored({ user: s.user, organization: s.organization, token: s.token, role, currency: s.currency });
+      writeStored({ user: s.user, organization: s.organization, memberships: s.memberships, token: s.token, role, currency: s.currency });
       return next;
     });
   }, []);
+
+  const switchOrganization = useCallback(async (organizationId) => {
+    const res = await api.post(`/organizations/${organizationId}/switch/`);
+    const current = readStored();
+    const next = {
+      organization: responseValue(res.data, 'active_organization'),
+      memberships: responseValue(res.data, 'memberships', []),
+      role: responseValue(res.data, 'role'),
+      token: current?.token ?? state.token,
+    };
+    applyAuth(next);
+    return res.data;
+  }, [applyAuth, state.token]);
 
   const value = useMemo(
     () => ({
@@ -233,9 +284,10 @@ export function AuthProvider({ children }) {
       refreshSession,
       setOrganization,
       setRole,
+      switchOrganization,
       applyAuth,
     }),
-    [state, login, register, logout, googleLogin, sendTwoFactorCode, verifyTwoFactorCode, resendVerification, refreshSession, setOrganization, setRole, applyAuth]
+    [state, login, register, logout, googleLogin, sendTwoFactorCode, verifyTwoFactorCode, resendVerification, refreshSession, setOrganization, setRole, switchOrganization, applyAuth]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

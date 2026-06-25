@@ -5,6 +5,7 @@ import Logo from "../components/Logo.jsx";
 import Button from "../components/Button.jsx";
 import { Input } from "../components/Field.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { getInvitePath, readPendingInviteToken, storePendingInviteToken } from "../lib/inviteFlow.js";
 
 /**
  * Extract an invite token from either a full invite URL or a raw token string.
@@ -28,18 +29,18 @@ function extractToken(raw) {
 }
 
 export default function WorkspaceChoice() {
-  const { organization } = useAuth();
+  const { organization, memberships, switchOrganization } = useAuth();
   const navigate = useNavigate();
   const [inviteValue, setInviteValue] = useState("");
   const [inviteError, setInviteError] = useState("");
+  const [switchingId, setSwitchingId] = useState(null);
+  const [pendingInviteToken] = useState(() => readPendingInviteToken());
 
   useEffect(() => {
-    if (organization) {
-      navigate("/dashboard", { replace: true });
+    if (pendingInviteToken) {
+      navigate(getInvitePath(pendingInviteToken), { replace: true });
     }
-  }, [organization, navigate]);
-
-  if (organization) return null;
+  }, [pendingInviteToken, navigate]);
 
   const handleJoin = (e) => {
     e.preventDefault();
@@ -49,8 +50,27 @@ export default function WorkspaceChoice() {
       setInviteError("Paste a valid invite link or token.");
       return;
     }
+    storePendingInviteToken(token);
     navigate(`/invite?token=${encodeURIComponent(token)}`);
   };
+
+  const chooseWorkspace = async (membership) => {
+    const orgId = membership.organization_id ?? membership.organization?.id;
+    if (!orgId) return;
+    if (String(orgId) === String(organization?.id)) {
+      navigate("/dashboard", { replace: true });
+      return;
+    }
+    setSwitchingId(orgId);
+    try {
+      await switchOrganization(orgId);
+      navigate("/dashboard", { replace: true });
+    } finally {
+      setSwitchingId(null);
+    }
+  };
+
+  const hasMemberships = Array.isArray(memberships) && memberships.length > 0;
 
   return (
     <div className="min-h-screen flex flex-col bg-paper">
@@ -63,16 +83,76 @@ export default function WorkspaceChoice() {
           {/* Heading */}
           <div className="text-center">
             <h1 className="font-display text-3xl sm:text-4xl font-medium text-ink leading-tight tracking-tight">
-              Start your workspace
+              {hasMemberships ? "Choose workspace" : "Start your workspace"}
             </h1>
             <p className="mt-2 text-sm text-ink-muted">
-              Create a workspace for your business or join one with an invite.
+              {hasMemberships
+                ? "Select the organization you want to work in now."
+                : "Create a workspace for your business or join one with an invite."}
             </p>
           </div>
 
           <div className="mt-10 space-y-4">
+            {pendingInviteToken && (
+              <div className="rounded-lg border border-saffron-200 bg-saffron-50 p-5">
+                <p className="text-sm font-medium text-ink">
+                  Continue your invitation
+                </p>
+                <p className="mt-1 text-sm text-saffron-800">
+                  You opened an organization invite. Continue there before creating a new workspace.
+                </p>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  className="mt-4 w-full sm:w-auto"
+                  onClick={() => navigate(getInvitePath(pendingInviteToken))}
+                  iconRight={<ArrowRight size={15} />}
+                >
+                  Continue invitation
+                </Button>
+              </div>
+            )}
+
             {/* ── Create workspace card ── */}
-            <div className="rounded-lg border border-rule bg-paper-deep p-6">
+            {hasMemberships && (
+              <div className="rounded-lg border border-rule bg-paper-deep p-4">
+                <div className="space-y-2">
+                  {memberships.map((membership) => {
+                    const org = membership.organization ?? {
+                      id: membership.organization_id,
+                      name: membership.organization_name,
+                    };
+                    const active = String(org.id) === String(organization?.id);
+                    return (
+                      <button
+                        key={membership.id ?? org.id}
+                        type="button"
+                        onClick={() => chooseWorkspace(membership)}
+                        className="flex w-full items-center gap-3 rounded-md border border-rule bg-paper px-3 py-3 text-left transition-colors hover:bg-paper-deep focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-2"
+                      >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper-deep text-ink-muted border border-rule">
+                          <Building2 size={18} strokeWidth={1.8} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-ink">
+                            {org.name}
+                          </span>
+                          <span className="block text-xs text-ink-muted">
+                            {membership.role}{active ? " - current workspace" : ""}
+                          </span>
+                        </span>
+                        <span className="text-xs font-medium text-ink-muted">
+                          {switchingId === org.id ? "Switching..." : "Open"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-lg border border-rule bg-paper-deep p-6 hover:shadow-sm transition-shadow duration-200">
               <div className="flex items-start gap-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-paper text-cinnabar-600 border border-rule">
                   <Building2 size={20} strokeWidth={1.8} />
@@ -101,7 +181,7 @@ export default function WorkspaceChoice() {
             </div>
 
             {/* ── Join workspace card ── */}
-            <div className="rounded-lg border border-rule bg-paper-deep p-6">
+            <div className="rounded-lg border border-rule bg-paper-deep p-6 hover:shadow-sm transition-shadow duration-200">
               <div className="flex items-start gap-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-paper text-ink-muted border border-rule">
                   <LogIn size={20} strokeWidth={1.8} />

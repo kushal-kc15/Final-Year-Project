@@ -1,30 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Check, Building2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronDown, Check, Building2, Plus } from 'lucide-react';
 import api from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { cn } from '../lib/utils.js';
 
-/**
- * OrgSwitcher — flat dropdown, hairline-ruled, not a floating panel.
- * The selected org is the one in the chip. Clicking reveals the list with
- * a small +Create option at the bottom.
- */
 export function OrgSwitcher() {
-  const { organization, setOrganization, applyAuth, token, refreshSession } = useAuth();
+  const { organization, memberships, token, switchOrganization } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-
-  const [orgs, setOrgs] = useState([]);
+  const [items, setItems] = useState(memberships ?? []);
   const [loading, setLoading] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
+    setItems(memberships ?? []);
+  }, [memberships]);
+
+  useEffect(() => {
     if (!open || !token) return;
     setLoading(true);
-    api.get('/organizations/')
-      .then((r) => setOrgs(Array.isArray(r.data) ? r.data : r.data?.results ?? []))
-      .catch(() => setOrgs([]))
+    api.get('/organizations/memberships/')
+      .then((r) => setItems(Array.isArray(r.data?.memberships) ? r.data.memberships : []))
+      .catch(() => setItems(memberships ?? []))
       .finally(() => setLoading(false));
-  }, [open, token]);
+  }, [memberships, open, token]);
 
   useEffect(() => {
     const onClick = (e) => {
@@ -34,18 +34,20 @@ export function OrgSwitcher() {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  const handleSelect = async (org) => {
+  const handleSelect = async (membership) => {
+    const org = membership.organization ?? {
+      id: membership.organization_id,
+      name: membership.organization_name,
+    };
     if (org.id === organization?.id) {
       setOpen(false);
       return;
     }
     try {
-      await api.post(`/organizations/${org.id}/switch/`);
-      await refreshSession();
+      await switchOrganization(org.id);
+      navigate(window.location.pathname, { replace: true });
     } catch {
-
-      // Fall back to local switch if endpoint not implemented.
-      setOrganization(org);
+      // Keep the old workspace selected if the backend rejects the switch.
     }
     setOpen(false);
   };
@@ -61,11 +63,11 @@ export function OrgSwitcher() {
       >
         <Building2 size={14} className="text-ink-muted" strokeWidth={1.5} />
         <span className="min-w-0 truncate font-medium text-ink">{organization?.name ?? 'No workspace'}</span>
-        <ChevronDown size={14} className={cn('text-ink-muted transition-transform', open && 'rotate-180')} strokeWidth={1.5} />
+        <ChevronDown size={14} className={cn('text-ink-muted transition-transform duration-200', open && 'rotate-180')} strokeWidth={1.5} />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-64 max-w-[calc(100vw-1.5rem)] bg-paper border border-rule rounded-md shadow-lift overflow-hidden animate-drawer">
+        <div className="absolute right-0 top-full mt-1 z-50 w-64 max-w-[calc(100vw-1.5rem)] bg-paper border border-rule rounded-md shadow-lift overflow-hidden animate-drawer origin-top-right">
           <p className="px-3 py-2 text-micro uppercase tracking-eyebrow text-ink-muted border-b border-rule">
             Your workspaces
           </p>
@@ -73,18 +75,23 @@ export function OrgSwitcher() {
             {loading && (
               <li className="px-3 py-2 text-sm text-ink-muted">Loading…</li>
             )}
-            {!loading && orgs.length === 0 && (
+            {!loading && items.length === 0 && (
               <li className="px-3 py-2 text-sm text-ink-muted">No workspaces yet.</li>
             )}
-            {orgs.map((org) => {
+            {items.map((membership) => {
+              const org = membership.organization ?? {
+                id: membership.organization_id,
+                name: membership.organization_name,
+              };
               const active = org.id === organization?.id;
               return (
-                <li key={org.id}>
+                <li key={membership.id ?? org.id}>
                   <button
                     type="button"
-                    onClick={() => handleSelect(org)}
+                    onClick={() => handleSelect(membership)}
                     className={cn(
-                      'w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-paper-deep transition-colors',
+                      'w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors relative',
+                      'hover:bg-paper-deep',
                       active && 'bg-paper-deep'
                     )}
                     role="option"
@@ -93,14 +100,27 @@ export function OrgSwitcher() {
                     <Building2 size={14} className="text-ink-muted shrink-0" strokeWidth={1.5} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-ink">{org.name}</p>
-                      {org.role && <p className="text-[11px] text-ink-muted">{org.role}</p>}
+                      {membership.role && <p className="text-[11px] text-ink-muted">{membership.role}</p>}
                     </div>
-                    {active && <Check size={14} className="text-cinnabar-500" strokeWidth={1.75} />}
+                    {active && <Check size={14} className="text-forest" strokeWidth={1.75} />}
                   </button>
                 </li>
               );
             })}
           </ul>
+          <div className="border-t border-rule px-3 py-2">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                navigate('/organization/setup');
+              }}
+              className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink transition-colors"
+            >
+              <Plus size={14} strokeWidth={1.5} />
+              Create new workspace
+            </button>
+          </div>
         </div>
       )}
     </div>

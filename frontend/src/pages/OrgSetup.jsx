@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Building2, Loader2 } from "lucide-react";
 import Logo from "../components/Logo.jsx";
@@ -16,7 +16,7 @@ const CURRENCIES = [
 ];
 
 export default function OrgSetup() {
-  const { applyAuth, organization, token } = useAuth();
+  const { switchOrganization, organization } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const [form, setForm] = useState({
@@ -30,10 +30,6 @@ export default function OrgSetup() {
   const [loading, setLoading] = useState(false);
 
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  useEffect(() => {
-    if (organization) navigate("/dashboard", { replace: true });
-  }, [navigate, organization]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -51,18 +47,8 @@ export default function OrgSetup() {
         name: form.name.trim(),
         description: form.industry.trim(),
       });
-      // 2. Activate it — not silenced; a failed switch is a real error.
-      await api.post(`/organizations/${res.data.id}/switch/`);
-      // 3. Fetch fresh session now that active_organization is set.
-      const me = await api.get("/auth/me/");
-      applyAuth({
-        user: me.data,
-        organization:
-          me.data.active_organization ?? me.data.organization ?? res.data,
-        token,
-        role: me.data.role ?? "OWNER",
-        currency: form.currency || "NPR",
-      });
+      // 2. Activate it and update local workspace state before the next request.
+      await switchOrganization(res.data.id);
       toast.success("Your workspace is ready.");
       navigate("/dashboard", { replace: true });
     } catch (e2) {
@@ -73,7 +59,6 @@ export default function OrgSetup() {
           fieldErrs[k] = Array.isArray(v) ? v[0] : String(v);
         });
         setErr(fieldErrs);
-        // Surface errors that have no inline form field (detail, error, non_field_errors).
         const nonFieldMsg =
           fieldErrs.detail ||
           fieldErrs.error ||
@@ -88,29 +73,6 @@ export default function OrgSetup() {
     }
   };
 
-  if (organization) {
-    return (
-      <div className="min-h-screen flex flex-col bg-paper">
-        <header className="px-4 py-5 sm:px-10">
-          <Logo size={28} withWordmark wordmarkSize="lg" />
-        </header>
-        <main className="flex-1 flex items-center justify-center px-4 py-8 sm:px-10 sm:py-10">
-          <div className="w-full max-w-sm text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-paper-deep text-ink-muted">
-              <Building2 size={24} strokeWidth={1.8} />
-            </div>
-            <h1 className="mt-4 font-display text-3xl sm:text-4xl font-medium text-ink leading-tight tracking-tight">
-              Workspace already set up
-            </h1>
-            <p className="mt-2 text-sm text-ink-muted">
-              You already have a workspace. Taking you to the dashboard…
-            </p>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col bg-paper">
       <header className="px-4 py-5 sm:px-10 flex flex-wrap items-center justify-between gap-3">
@@ -118,7 +80,7 @@ export default function OrgSetup() {
         <div className="flex items-center gap-4">
           <Link
             to="/workspace/start"
-            className="text-sm text-ink-muted hover:text-ink"
+            className="text-sm text-ink-muted hover:text-ink transition-colors"
           >
             ← Back
           </Link>
@@ -135,9 +97,10 @@ export default function OrgSetup() {
               <Building2 size={24} strokeWidth={1.8} />
             </div>
             <h1 className="mt-4 font-display text-3xl sm:text-4xl font-medium text-ink leading-tight tracking-tight">
-              Name your workspace
+              {organization ? "Create another workspace" : "Name your workspace"}
             </h1>
             <p className="mt-2 text-sm text-ink-muted">
+              {organization ? "Add a separate organization without losing access to your current workspace. " : ""}
               This workspace will hold your books. The workspace name and
               optional industry description are saved now. Team size, country,
               and currency are local setup preferences for your first view.
