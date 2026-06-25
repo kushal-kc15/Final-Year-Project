@@ -259,10 +259,15 @@ export function AuthProvider({ children }) {
   }, []);
 
   const switchOrganization = useCallback(async (organizationId) => {
-    const res = await api.post(`/organizations/${organizationId}/switch/`);
+    const targetOrganizationId = String(organizationId);
+    const res = await api.post(
+      `/organizations/${targetOrganizationId}/switch/`,
+      {},
+      { headers: { 'X-Organization-Id': targetOrganizationId } },
+    );
     const current = readStored();
     const next = {
-      organization: responseValue(res.data, 'active_organization'),
+      organization: responseValue(res.data, 'active_organization', responseValue(res.data, 'organization')),
       memberships: responseValue(res.data, 'memberships', []),
       role: responseValue(res.data, 'role'),
       token: current?.token ?? state.token,

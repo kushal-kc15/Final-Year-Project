@@ -246,7 +246,7 @@ function StatusDot({ status }) {
  * The page.
  * ------------------------------------------------------------------ */
 export default function Dashboard() {
-  const { organization, currency, role: authRole } = useAuth();
+  const { organization, currency, user, role: authRole } = useAuth();
 
   const rawRole = authRole ?? null;
   const normalizedRole =

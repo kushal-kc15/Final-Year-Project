@@ -328,6 +328,31 @@ class OrganizationTestCase(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.active_organization_id, second_org.id)
 
+    def test_switch_returns_target_org_when_request_header_is_stale(self):
+        old_org = Organization.objects.create(name='Old Org')
+        target_org = Organization.objects.create(name='Target Org')
+        OrganizationMember.objects.create(organization=old_org, user=self.user, role='STAFF')
+        target_member = OrganizationMember.objects.create(
+            organization=target_org,
+            user=self.user,
+            role='OWNER',
+        )
+        self.user.active_organization = old_org
+        self.user.save(update_fields=['active_organization'])
+
+        response = self.client.post(
+            f'/api/organizations/{target_org.id}/switch/',
+            HTTP_X_ORGANIZATION_ID=str(old_org.id),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.active_organization_id, target_org.id)
+        self.assertEqual(response.data['active_organization']['id'], target_org.id)
+        self.assertEqual(response.data['organization']['id'], target_org.id)
+        self.assertEqual(response.data['membership_id'], target_member.id)
+        self.assertEqual(response.data['role'], 'OWNER')
+
     def test_owner_can_invite_existing_user_from_another_organization(self):
         org = Organization.objects.create(name='Target Org')
         other_org = Organization.objects.create(name='Other Org')

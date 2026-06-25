@@ -39,7 +39,7 @@ export function OrgSwitcher() {
       id: membership.organization_id,
       name: membership.organization_name,
     };
-    if (org.id === organization?.id) {
+    if (String(org.id) === String(organization?.id)) {
       setOpen(false);
       return;
     }
@@ -83,7 +83,7 @@ export function OrgSwitcher() {
                 id: membership.organization_id,
                 name: membership.organization_name,
               };
-              const active = org.id === organization?.id;
+              const active = String(org.id) === String(organization?.id);
               return (
                 <li key={membership.id ?? org.id}>
                   <button
@@ -113,12 +113,12 @@ export function OrgSwitcher() {
               type="button"
               onClick={() => {
                 setOpen(false);
-                navigate('/organization/setup');
+                navigate('/workspace/start');
               }}
               className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-ink transition-colors"
             >
               <Plus size={14} strokeWidth={1.5} />
-              Create new workspace
+              Switch workspace
             </button>
           </div>
         </div>

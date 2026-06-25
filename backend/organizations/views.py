@@ -16,6 +16,7 @@ from .emails import send_invitation_email
 from .permissions import IsInvitationOwner, IsOrganizationOwner
 from .context import (
     build_workspace_payload,
+    get_user_memberships,
     set_active_organization,
     accept_invitation_for_user,
 )
@@ -68,9 +69,29 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         """Set the active workspace to this organization."""
         organization = self.get_object()
         member = set_active_organization(request.user, organization.id)
-        payload = build_workspace_payload(request.user, request)
-        payload['message'] = f'Switched to {organization.name}'
-        payload['membership_id'] = member.id
+        memberships = get_user_memberships(request.user)
+        membership_data = [
+            {
+                'id': item.id,
+                'organization_id': item.organization_id,
+                'organization_name': item.organization.name,
+                'role': item.role,
+                'joined_at': item.joined_at,
+            }
+            for item in memberships
+        ]
+        active_organization = {
+            'id': organization.id,
+            'name': organization.name,
+        }
+        payload = {
+            'message': f'Switched to {organization.name}',
+            'membership_id': member.id,
+            'memberships': membership_data,
+            'active_organization': active_organization,
+            'organization': active_organization,
+            'role': member.role,
+        }
         return Response(payload)
 
     @action(detail=True, methods=['post'])
