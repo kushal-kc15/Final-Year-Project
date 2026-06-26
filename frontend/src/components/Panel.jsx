@@ -2,13 +2,11 @@ import { cn } from '../lib/utils.js';
 
 /**
  * The single unit of grouping. A panel is a paper surface inside a hairline rule.
- * No drop shadow. No rounded-2xl. No fake elevation.
- *
- * Variants:
- *  - default: paper-on-paper
- *  - deep:    paper-deep (slightly darker) — used to nest inside a default panel
- *  - ledger:  paper with a single cinnabar top rule — used for an important block on a page
- *  - inset:   sunken into the page, no outer border, only inner content separated by hairlines
+ * - default: paper-on-paper with border
+ * - deep: slightly darker background (for nested sections)
+ * - ledger: a cinnabar top border – for important blocks
+ * - elevated: subtle shadow for depth (use sparingly)
+ * - inset: no border, sunken (use inside other panels)
  */
 export function Panel({
   variant = 'default',
@@ -21,6 +19,7 @@ export function Panel({
     default: 'bg-paper border border-rule',
     deep:    'bg-paper-deep border border-rule',
     ledger:  'bg-paper border border-rule border-t-2 border-t-cinnabar-500',
+    elevated: 'bg-paper border border-rule shadow-sm hover:shadow-md transition-shadow duration-200',
     inset:   'bg-paper-deep border-0',
   };
   return (
@@ -38,12 +37,22 @@ export function PanelTitle({ children, className }) {
   );
 }
 
-export function PanelHeader({ title, subtitle, kicker, action, children, className }) {
+export function PanelHeader({
+  title,
+  subtitle,
+  kicker,
+  action,
+  children,
+  className,
+}) {
   return (
-    <header className={cn('flex flex-col gap-3 border-b border-rule px-4 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:px-5', className)}>
+    <header className={cn(
+      'flex flex-col gap-3 border-b border-rule px-4 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:px-5',
+      className
+    )}>
       <div className="min-w-0">
         {kicker && <p className="text-micro uppercase tracking-eyebrow text-ink-muted mb-1">{kicker}</p>}
-        {title && <h3 className="font-display text-lg font-medium text-ink leading-tight">{title}</h3>}
+        {title && <PanelTitle>{title}</PanelTitle>}
         {subtitle && <p className="mt-1 text-sm text-ink-muted leading-snug">{subtitle}</p>}
         {children}
       </div>
@@ -57,5 +66,9 @@ export function PanelBody({ className, children, dense = false }) {
 }
 
 export function PanelFoot({ className, children }) {
-  return <footer className={cn('px-5 py-3 border-t border-rule text-xs text-ink-muted', className)}>{children}</footer>;
+  return (
+    <footer className={cn('px-5 py-3 border-t border-rule text-xs text-ink-muted', className)}>
+      {children}
+    </footer>
+  );
 }

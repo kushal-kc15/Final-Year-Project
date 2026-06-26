@@ -1,16 +1,20 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],
   theme: {
     extend: {
+      // ---- Fonts ----
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
-        display: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        display: ['Instrument Serif', 'Georgia', 'serif'],
         mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
       },
+
+      // ---- Typography ----
       fontSize: {
         '2xs': ['0.6875rem', { lineHeight: '1rem', letterSpacing: '0.02em' }],
-        'micro': ['0.6875rem', { lineHeight: '1rem', letterSpacing: '0.14em' }],
+        micro: ['0.6875rem', { lineHeight: '1rem', letterSpacing: '0.14em' }],
         xs: ['0.75rem', { lineHeight: '1.125rem' }],
         sm: ['0.8125rem', { lineHeight: '1.25rem' }],
         base: ['0.875rem', { lineHeight: '1.375rem' }],
@@ -24,57 +28,70 @@ export default {
         '7xl': ['4.75rem', { lineHeight: '0.98', letterSpacing: '-0.04em' }],
         '8xl': ['6rem', { lineHeight: '0.95', letterSpacing: '-0.04em' }],
       },
+
       letterSpacing: {
         eyebrow: '0.14em',
       },
+
+      // ---- Colors ----
       colors: {
-        // Paper — the body bg. A true off-white with a barely-there warm tint,
-        // not the "saturated cream" AI default. Stays chroma-light so text reads.
+        // Paper – the body background. Warm off-white.
         paper: {
-          DEFAULT: '#fbfaf7',
-          deep: '#f3f1ea',
-          edge: '#ece8de',
+          DEFAULT: 'rgb(var(--color-paper) / <alpha-value>)',
+          deep: 'rgb(var(--color-paper-deep) / <alpha-value>)',
+          edge: 'rgb(var(--color-paper-edge) / <alpha-value>)',
         },
-        // Ink — typographic scale. Each step has a real reason to exist.
+
+        // Ink – typographic scale.
         ink: {
-          DEFAULT: '#1c1a17',
-          soft:   '#3d3a35',
-          muted:  '#6f6a62',
-          faint:  '#a39e95',
+          DEFAULT: 'rgb(var(--color-ink) / <alpha-value>)',
+          soft: 'rgb(var(--color-ink-soft) / <alpha-value>)',
+          muted: 'rgb(var(--color-ink-muted) / <alpha-value>)',
+          faint: 'rgb(var(--color-ink-faint) / <alpha-value>)',
         },
-        // Rules — borders / hairlines.
+
+        // Rules – borders / hairlines.
         rule: {
-          DEFAULT: '#e3ddd0',
-          strong:  '#cbc3b1',
+          DEFAULT: 'rgb(var(--color-rule) / <alpha-value>)',
+          strong: 'rgb(var(--color-rule-strong) / <alpha-value>)',
         },
-        // Cinnabar — the red ink. The single saturated accent on the page.
+
+        // Cinnabar – primary accent (red ink).
         cinnabar: {
-          50:  '#fbeeea',
-          200: '#f1c3b7',
-          300: '#e89987',
-          500: '#c2412a',
-          600: '#a8331f',
-          700: '#8a291a',
+          50: 'rgb(var(--color-cinnabar-50) / <alpha-value>)',
+          200: 'rgb(var(--color-cinnabar-200) / <alpha-value>)',
+          300: 'rgb(var(--color-cinnabar-300) / <alpha-value>)',
+          500: 'rgb(var(--color-cinnabar-500) / <alpha-value>)',
+          600: 'rgb(var(--color-cinnabar-600) / <alpha-value>)',
+          700: 'rgb(var(--color-cinnabar-700) / <alpha-value>)',
         },
-        // Moss — the positive / "in balance" tone.
+
+        // Moss – positive / "in balance" tone.
         moss: {
-          50:  '#ebf2e8',
-          500: '#5a7a4a',
-          700: '#3e5632',
+          50: 'rgb(var(--color-moss-50) / <alpha-value>)',
+          200: 'rgb(var(--color-moss-200) / <alpha-value>)',
+          500: 'rgb(var(--color-moss-500) / <alpha-value>)',
+          600: 'rgb(var(--color-moss-600) / <alpha-value>)',
+          700: 'rgb(var(--color-moss-700) / <alpha-value>)',
         },
-        // Saffron — the caution / "watch" tone.
+
+        // Saffron – caution / "watch" tone.
         saffron: {
-          50:  '#fbf2e0',
-          500: '#c98c2b',
-          700: '#8d5e15',
+          50: 'rgb(var(--color-saffron-50) / <alpha-value>)',
+          200: 'rgb(var(--color-saffron-200) / <alpha-value>)',
+          500: 'rgb(var(--color-saffron-500) / <alpha-value>)',
+          600: 'rgb(var(--color-saffron-600) / <alpha-value>)',
+          700: 'rgb(var(--color-saffron-700) / <alpha-value>)',
         },
-        // Inkwell — the neutral ledger text.
+
+        // Inkwell – neutral ledger text.
         inkwell: {
-          50:  '#f0eee9',
+          50: '#f0eee9',
           500: '#7a7468',
           700: '#3d3a35',
         },
-        // Surface system (kept for any non-ledger pages).
+
+        // Legacy surface system (kept for compatibility).
         surface: {
           DEFAULT: '#ffffff',
           muted: '#faf8f3',
@@ -86,78 +103,72 @@ export default {
         },
         canvas: '#fbfaf7',
 
-        // ---- Landing palette (additive; existing tokens untouched) ----
-        // Warm ivory page bg with a touch more amber than generic cream.
+        // Landing page palette (additive).
         ivory: {
           DEFAULT: '#F7F1E1',
-          soft:    '#F2EAD3',
-          deep:    '#EADFC2',
+          soft: '#F2EAD3',
+          deep: '#EADFC2',
         },
-        // Charcoal — slightly warmer than ink, used for the landing type.
         charcoal: {
           DEFAULT: '#2A241D',
-          soft:    '#4A4239',
-          muted:   '#7C7060',
-          faint:   '#A89D8B',
+          soft: '#4A4239',
+          muted: '#7C7060',
+          faint: '#A89D8B',
         },
-        // Coral — primary CTA. Real terracotta family, not the AI pastel-coral.
         coral: {
-          50:  '#FCEBE7',
+          50: '#FCEBE7',
           100: '#F8D2C8',
           200: '#F0AE9C',
           500: '#E26B4D',
           600: '#C95940',
           700: '#A8472F',
         },
-        // Forest — success / approved accents.
         forest: {
-          50:  '#E6F0EA',
-          100: '#C9DDD0',
-          200: '#A4C7AE',
-          500: '#3F7259',
-          600: '#345E48',
-          700: '#284A39',
+          50: 'rgb(var(--color-forest-50) / <alpha-value>)',
+          100: 'rgb(var(--color-forest-100) / <alpha-value>)',
+          200: 'rgb(var(--color-forest-200) / <alpha-value>)',
+          500: 'rgb(var(--color-forest-500) / <alpha-value>)',
+          600: 'rgb(var(--color-forest-600) / <alpha-value>)',
+          700: 'rgb(var(--color-forest-700) / <alpha-value>)',
         },
-        // Teal — secondary success / report accent.
         teal: {
-          50:  '#DBEEEC',
+          50: '#DBEEEC',
           100: '#B6DAD6',
           200: '#84C2BC',
           500: '#2E8078',
           600: '#266963',
           700: '#1D524D',
         },
-        // Amber — pending / budget warning accents.
         amber: {
-          50:  '#FAEBD2',
+          50: '#FAEBD2',
           100: '#F2D3A4',
           200: '#E5B470',
           500: '#D88A41',
           600: '#BA6F2D',
           700: '#8E5520',
         },
-        // Sage / mint / peach — soft visual panels behind content.
         sage: {
-          50:  '#EBF1E7',
+          50: '#EBF1E7',
           100: '#D6E2CC',
           200: '#B8CFA9',
         },
         mint: {
-          50:  '#E2EFE9',
+          50: '#E2EFE9',
           100: '#C5DDD5',
           200: '#9BC8BB',
         },
         peach: {
-          50:  '#FAE6D5',
+          50: '#FAE6D5',
           100: '#F2CFAE',
           200: '#E8B081',
         },
-        // Warm subtle borders for white cards on tinted panels.
         warmborder: {
           DEFAULT: '#EBE0C5',
-          strong:  '#D8C9A2',
+          strong: '#D8C9A2',
         },
       },
+
+      // ---- Borders ----
       borderRadius: {
         sm: '0.375rem',
         DEFAULT: '0.5rem',
@@ -166,6 +177,8 @@ export default {
         xl: '1rem',
         pill: '9999px',
       },
+
+      // ---- Shadows ----
       boxShadow: {
         xs: '0 1px 2px 0 rgba(28, 26, 23, 0.05)',
         sm: '0 1px 3px 0 rgba(28, 26, 23, 0.07), 0 1px 2px -1px rgba(28, 26, 23, 0.04)',
@@ -173,13 +186,16 @@ export default {
         pop: '0 18px 40px -16px rgba(28, 26, 23, 0.18), 0 2px 6px -2px rgba(28, 26, 23, 0.06)',
         page: '0 1px 0 0 rgba(28, 26, 23, 0.04), 0 12px 32px -10px rgba(28, 26, 23, 0.10)',
       },
+
+      // ---- Animations ----
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
         'fade-in-up': 'fadeInUp 0.28s ease-out forwards',
         'draw': 'draw 1.4s ease-out forwards',
-        'tick': 'tick 0.4s ease-out 1.2s both',
         'shimmer': 'shimmer 1.6s linear infinite',
+        'drawer': 'drawer 0.2s ease-out',
       },
+
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0' },
@@ -193,13 +209,13 @@ export default {
           '0%': { strokeDashoffset: '200' },
           '100%': { strokeDashoffset: '0' },
         },
-        tick: {
-          '0%': { opacity: '0', transform: 'scale(0.92)' },
-          '100%': { opacity: '1', transform: 'scale(1)' },
-        },
         shimmer: {
           '0%': { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(100%)' },
+        },
+        drawer: {
+          '0%': { opacity: '0', transform: 'scale(0.96) translateY(-4px)' },
+          '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
         },
       },
     },

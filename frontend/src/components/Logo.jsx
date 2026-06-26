@@ -1,41 +1,64 @@
 /**
- * Vyapar Margadarshan logomark.
+ * Vyapar Margadarshan logo.
  *
- * A ledger page (ruled lines) and a cinnabar underline that runs off the page
- * — suggesting a real accountant's ledger with a red-ink pen at work. No
- * gradient, no glow, no rounded-2xl frame.
+ * Flat SVG app mark: warm terracotta square with a bold white receipt roll.
+ * Supports an optional compact wordmark for the app shell and wider nav space.
  */
-export default function Logo({ size = 32, className, withWordmark = false, wordmarkSize = 'md' }) {
+export default function Logo({
+  size = 32,
+  className = '',
+  showText,
+  withWordmark = false,
+  wordmarkSize = 'md',
+}) {
+  const shouldShowText = showText ?? withWordmark;
+  const wordmarkSizes = {
+    sm: 'text-sm',
+    md: 'text-base',
+    lg: 'text-lg',
+  };
+
   return (
-    <span className={`inline-flex items-center gap-2.5 ${className ?? ''}`}>
+    <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <svg
         width={size}
         height={size}
-        viewBox="0 0 32 32"
+        viewBox="0 0 64 64"
         fill="none"
         aria-label="Vyapar Margadarshan"
         role="img"
+        className="shrink-0"
       >
-        {/* Page */}
-        <rect x="4" y="4" width="18" height="24" rx="1" fill="oklch(0.985 0.003 85)" stroke="oklch(0.20 0.012 260)" strokeWidth="1.4" />
-        {/* Ruled lines */}
-        <line x1="8" y1="10" x2="18" y2="10" stroke="oklch(0.20 0.012 260)" strokeWidth="1" />
-        <line x1="8" y1="14" x2="18" y2="14" stroke="oklch(0.20 0.012 260)" strokeWidth="1" />
-        <line x1="8" y1="18" x2="16" y2="18" stroke="oklch(0.20 0.012 260)" strokeWidth="1" />
-        {/* Red-ink total line — runs off the page */}
-        <line x1="8" y1="24" x2="30" y2="24" stroke="oklch(0.56 0.17 25)" strokeWidth="1.8" strokeLinecap="round" />
-        <line x1="22" y1="6" x2="30" y2="6" stroke="oklch(0.56 0.17 25)" strokeWidth="1.8" strokeLinecap="round" />
+        <rect width="64" height="64" rx="14" fill="#C95F43" />
+
+        <g
+          stroke="#FFF8EF"
+          strokeWidth="4.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {/* Main receipt sheet with jagged bottom. */}
+          <path d="M40.5 14H22.2c-4.1 0-6.1 3.5-8.4 9.1-3.9 9.6-3.8 21.4 1 31.3 1 2 2.3 4.3 3.9 4.3 1.5 0 3.6-3.7 5.4-3.7 1.7 0 3.9 3.7 5.6 3.7 1.8 0 3.9-3.7 5.7-3.7 2.4 0 6.2 4.1 13.2 3.6" />
+
+          {/* Rolled top-right receipt curl. */}
+          <path d="M40.5 14c-4.9 5.9-7.7 18.9-5.2 31.2 1.4 6.9 4.5 11.7 9.4 13.1" />
+          <path d="M40.5 14h4.7c4.6 0 7.7 7.1 9 13.2l1.1 5.3c.5 2.4-1.2 4.5-3.6 4.5H35.2" />
+
+          {/* Ledger marks. */}
+          <path d="M22.1 25.4h10" />
+          <path d="M20.8 32.1h10.7" />
+          <path d="M21.8 38.8h5.9" />
+        </g>
       </svg>
-      {withWordmark && (
-        <span className="leading-none">
-          <span className={`block font-display font-semibold text-ink ${wordmarkSize === 'lg' ? 'text-lg' : 'text-sm'}`}>
+
+      {shouldShowText && (
+        <span className="min-w-0 leading-none">
+          <span className={`block truncate font-display font-medium text-ink ${wordmarkSizes[wordmarkSize] || wordmarkSizes.md}`}>
             Vyapar Margadarshan
           </span>
-          {wordmarkSize === 'lg' && (
-            <span className="block text-micro uppercase tracking-eyebrow text-ink-muted mt-0.5">
-              Expense management
-            </span>
-          )}
+          <span className="mt-0.5 block truncate text-[0.62rem] font-semibold uppercase tracking-[0.15em] text-ink-muted">
+            Expense Management
+          </span>
         </span>
       )}
     </span>

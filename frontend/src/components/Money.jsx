@@ -20,20 +20,29 @@ export function Money({
   prefix,
 }) {
   const sizeMap = {
-    sm:  'text-sm',
-    md:  'text-base',
-    lg:  'text-xl',
-    xl:  'text-2xl',
+    xs: 'text-xs',
+    sm: 'text-sm',
+    md: 'text-base',
+    lg: 'text-xl',
+    xl: 'text-2xl',
     '2xl': 'text-3xl',
     display: 'text-4xl',
   };
+
   const raw = amount ?? value ?? 0;
-  const display = compact ? formatCompact(raw, currency) : formatCurrency(raw, currency);
+  const num = Number(raw);
+
+  if (isNaN(num)) {
+    return <span className={cn('num text-ink-muted', className)}>—</span>;
+  }
+
+  const display = compact ? formatCompact(num, currency) : formatCurrency(num, currency);
+
   return (
     <span
       className={cn(
         'num inline-block tabular-nums',
-        sizeMap[size],
+        sizeMap[size] || sizeMap.md,
         muted ? 'text-ink-muted' : 'text-ink',
         negative && 'text-cinnabar-700',
         align === 'right' && 'text-right',

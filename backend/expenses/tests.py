@@ -356,24 +356,34 @@ class ExpenseStatusPermissionTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data['error'], 'Only pending expenses can be edited.')
+        self.assertEqual(response.data['error'], 'Only pending or rejected expenses can be edited.')
         expense.refresh_from_db()
         self.assertEqual(expense.title, 'Submitted receipt')
 
-    def test_submitter_cannot_patch_rejected_expense(self):
+    @patch('expenses.views.notify_pending_approval')
+    def test_submitter_can_patch_rejected_expense_and_resubmit(self, notify_pending):
         expense = self.create_expense(status_value='REJECTED')
+        expense.reviewed_by = self.owner
+        expense.rejection_reason = 'Receipt was blurry'
+        expense.save(update_fields=['reviewed_by', 'rejection_reason'])
 
         response = self.client.patch(
             f'/api/expenses/{expense.id}/',
-            {'title': 'Changed rejected expense'},
+            {'title': 'Corrected rejected expense', 'vendor': 'Corrected vendor'},
             format='json',
             HTTP_X_ORGANIZATION_ID=str(self.organization.id),
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data['error'], 'Only pending expenses can be edited.')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         expense.refresh_from_db()
-        self.assertEqual(expense.title, 'Submitted receipt')
+        self.assertEqual(expense.title, 'Corrected rejected expense')
+        self.assertEqual(expense.vendor, 'Corrected vendor')
+        self.assertEqual(expense.status, 'PENDING')
+        self.assertIsNone(expense.reviewed_by)
+        self.assertIsNone(expense.reviewed_at)
+        self.assertEqual(expense.rejection_reason, '')
+        self.assertEqual(response.data['status'], 'PENDING')
+        notify_pending.assert_called_once()
 
     def test_owner_cannot_patch_another_users_expense_in_any_status(self):
         self.client.force_authenticate(user=self.owner)
@@ -657,6 +667,56 @@ class ExpenseApprovalDecisionTestCase(TestCase):
         expense_ids = {item['id'] for item in response.data}
         self.assertEqual(expense_ids, {staff_pending.id})
         self.assertNotIn(owner_pending.id, expense_ids)
+
+    @patch('expenses.views.notify_pending_approval')
+    @patch('expenses.views.notify_expense_approved')
+    @patch('expenses.views.notify_expense_rejected')
+    def test_rejected_expense_can_be_resubmitted_and_reviewed_again(
+        self,
+        notify_rejected,
+        notify_approved,
+        notify_pending,
+    ):
+        expense = self.create_expense(title='Needs correction')
+        self.authenticate(self.owner)
+
+        reject_response = self.client.post(
+            f'/api/expenses/{expense.id}/reject/',
+            {'reason': 'Receipt amount does not match'},
+            format='json',
+            HTTP_X_ORGANIZATION_ID=str(self.organization.id),
+        )
+
+        self.assertEqual(reject_response.status_code, status.HTTP_200_OK)
+        expense.refresh_from_db()
+        self.assertEqual(expense.status, 'REJECTED')
+
+        self.authenticate(self.staff)
+        resubmit_response = self.client.patch(
+            f'/api/expenses/{expense.id}/',
+            {'amount': '55.00', 'description': 'Corrected amount and receipt note'},
+            format='json',
+            HTTP_X_ORGANIZATION_ID=str(self.organization.id),
+        )
+
+        self.assertEqual(resubmit_response.status_code, status.HTTP_200_OK)
+        expense.refresh_from_db()
+        self.assertEqual(expense.status, 'PENDING')
+        self.assertEqual(expense.amount, Decimal('55.00'))
+        self.assertEqual(expense.rejection_reason, '')
+        notify_pending.assert_called_once()
+
+        self.authenticate(self.owner)
+        approve_response = self.client.post(
+            f'/api/expenses/{expense.id}/approve/',
+            HTTP_X_ORGANIZATION_ID=str(self.organization.id),
+        )
+
+        self.assertEqual(approve_response.status_code, status.HTTP_200_OK)
+        expense.refresh_from_db()
+        self.assertEqual(expense.status, 'APPROVED')
+        notify_rejected.assert_called_once()
+        notify_approved.assert_called_once()
 
     @patch('expenses.views.notify_expense_approved')
     @patch('expenses.views.notify_expense_rejected')

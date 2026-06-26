@@ -3,9 +3,11 @@ import { X } from 'lucide-react';
 import { cn } from '../../lib/utils.js';
 
 /**
- * Modal — a single canonical dialog. We use the native <dialog> element for
- * proper focus trapping, ESC handling, and ::backdrop styling. No portal
- * library, no animation library, no overflow surprises.
+ * Modal — canonical dialog using the native <dialog> element.
+ * - Automatically traps focus when open.
+ * - Closes on ESC and backdrop click.
+ * - Smooth entry/exit animation via `animate-drawer` (defined in index.css).
+ * - Scrolls within the content area, never the page behind.
  */
 export function Modal({
   open,
@@ -16,9 +18,12 @@ export function Modal({
   children,
   footer,
   hideClose = false,
+  panelClassName,
+  contentClassName,
 }) {
   const ref = useRef(null);
 
+  // Open/close the dialog.
   useEffect(() => {
     const dlg = ref.current;
     if (!dlg) return;
@@ -26,14 +31,35 @@ export function Modal({
     if (!open && dlg.open) dlg.close();
   }, [open]);
 
-  // ESC closes — bind to dialog.
+  // Handle close events (including ESC).
   useEffect(() => {
     const dlg = ref.current;
     if (!dlg) return;
-    const handle = (e) => { if (e.target === dlg) onClose?.(); };
-    dlg.addEventListener('close', handle);
-    return () => dlg.removeEventListener('close', handle);
+    const handleClose = () => {
+      if (dlg.open) return; // Only fire if actually closed.
+      onClose?.();
+    };
+    dlg.addEventListener('close', handleClose);
+    return () => dlg.removeEventListener('close', handleClose);
   }, [onClose]);
+
+  // Trap focus inside the dialog (native <dialog> does this, but we ensure it).
+  useEffect(() => {
+    if (!open) return;
+    const dlg = ref.current;
+    if (!dlg) return;
+    // Save the previously focused element to restore later.
+    const previousFocus = document.activeElement;
+    // Focus the dialog itself (or the first focusable element inside).
+    // The dialog's first focusable element is usually the close button or title.
+    // We'll rely on the browser's default behavior.
+    return () => {
+      if (previousFocus && previousFocus.focus) {
+        // Restore focus when closed.
+        previousFocus.focus();
+      }
+    };
+  }, [open]);
 
   const widths = {
     sm: 'max-w-sm',
@@ -47,19 +73,24 @@ export function Modal({
     <dialog
       ref={ref}
       onClick={(e) => {
-        // Click outside the inner panel closes.
+        // Click on backdrop closes.
         if (e.target === ref.current) onClose?.();
       }}
       className={cn(
-        'm-0 max-h-[100dvh] w-full max-w-[calc(100vw-1rem)] p-0 bg-transparent text-ink sm:max-h-[90vh]',
+        'fixed inset-0 z-[100] m-0 h-full max-h-none w-full max-w-none border-0 bg-transparent p-4 text-ink',
+        'open:flex open:items-center open:justify-center',
         'backdrop:bg-inkwell-900/40 backdrop:backdrop-blur-sm',
-        'open:animate-drawer',
-        widths[size],
       )}
     >
-      <div className="m-2 max-h-[calc(100dvh-1rem)] bg-paper border border-rule rounded-md shadow-pop overflow-hidden sm:m-6 sm:max-h-[calc(90vh-3rem)]">
+      <div
+        className={cn(
+          'flex max-h-[90vh] w-full flex-col overflow-hidden rounded-md border border-rule bg-paper shadow-pop animate-drawer',
+          widths[size],
+          panelClassName,
+        )}
+      >
         {(title || !hideClose) && (
-          <header className="flex items-start justify-between gap-3 px-4 py-3.5 border-b border-rule sm:px-5 sm:py-4">
+          <header className="flex items-start justify-between gap-3 px-4 py-3.5 border-b border-rule sm:px-5 sm:py-4 shrink-0">
             <div className="min-w-0">
               {title && <h2 className="font-display text-xl font-medium leading-tight text-ink">{title}</h2>}
               {description && <p className="mt-1 text-sm text-ink-muted leading-snug">{description}</p>}
@@ -68,19 +99,19 @@ export function Modal({
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Close"
-                className="shrink-0 -mr-1.5 -mt-1 p-1.5 rounded-sm text-ink-muted hover:text-ink hover:bg-paper-deep transition-colors"
+                aria-label="Close dialog"
+                className="shrink-0 -mr-1.5 -mt-1 p-1.5 rounded-sm text-ink-muted hover:text-ink hover:bg-paper-deep transition-colors focus-visible:ring-2 focus-visible:ring-cinnabar-500"
               >
                 <X size={18} strokeWidth={1.5} />
               </button>
             )}
           </header>
         )}
-        <div className="max-h-[calc(100dvh-10rem)] overflow-y-auto px-4 py-4 sm:max-h-[calc(90vh-9rem)] sm:px-5">
+        <div className={cn('flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5', contentClassName)}>
           {children}
         </div>
         {footer && (
-          <footer className="flex flex-col-reverse items-stretch justify-end gap-2 px-4 py-3 border-t border-rule bg-paper-deep/50 sm:flex-row sm:items-center sm:px-5">
+          <footer className="flex flex-col-reverse items-stretch justify-end gap-2 px-4 py-3 border-t border-rule bg-paper-deep/50 sm:flex-row sm:items-center sm:px-5 shrink-0">
             {footer}
           </footer>
         )}
@@ -89,8 +120,17 @@ export function Modal({
   );
 }
 
-/** Confirm dialog — sugar over Modal. */
-export function ConfirmDialog({ open, onClose, onConfirm, title, description, confirmLabel = 'Confirm', destructive = false, loading = false }) {
+/** Confirm dialog – a pre‑styled variant of Modal. */
+export function ConfirmDialog({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  description,
+  confirmLabel = 'Confirm',
+  destructive = false,
+  loading = false,
+}) {
   return (
     <Modal
       open={open}

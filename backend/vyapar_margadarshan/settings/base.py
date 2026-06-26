@@ -77,6 +77,7 @@ ALLOWED_HOSTS = config_list('ALLOWED_HOSTS', default='localhost,127.0.0.1')
 
 # Application definition
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -102,6 +103,87 @@ INSTALLED_APPS = [
     'notifications',
 ]
 
+JAZZMIN_SETTINGS = {
+    'site_title': 'Vyapar Admin',
+    'site_header': 'Vyapar Margadarshan',
+    'site_brand': 'Vyapar Margadarshan',
+    'welcome_sign': 'Website Manager Console',
+    'copyright': 'Vyapar Margadarshan',
+    'search_model': [],
+    'topmenu_links': [
+        {'name': 'Dashboard', 'url': 'admin:index', 'permissions': ['auth.view_user']},
+        {'name': 'Platform', 'model': 'users.User'},
+        {'name': 'Finance', 'model': 'expenses.Expense'},
+        {'name': 'System', 'model': 'activity_logs.ActivityLog'},
+    ],
+    'show_sidebar': True,
+    'navigation_expanded': True,
+    'hide_apps': [
+        'auth',
+        'analytics',
+        'sessions',
+        'token_blacklist',
+    ],
+    'hide_models': [
+        'users.PasswordResetToken',
+        'users.TwoFactorOTP',
+    ],
+    'order_with_respect_to': [
+        'users.User',
+        'organizations.Organization',
+        'organizations.OrganizationMember',
+        'organizations.Invitation',
+        'expenses.Expense',
+        'budgets.Budget',
+        'budgets.BudgetAlert',
+        'receipts.Receipt',
+        'notifications.Notification',
+        'activity_logs.ActivityLog',
+    ],
+    'icons': {
+        'users.User': 'fas fa-user',
+        'organizations.Organization': 'fas fa-building',
+        'organizations.OrganizationMember': 'fas fa-users-cog',
+        'organizations.Invitation': 'fas fa-envelope-open-text',
+        'expenses.Expense': 'fas fa-receipt',
+        'budgets.Budget': 'fas fa-wallet',
+        'budgets.BudgetAlert': 'fas fa-exclamation-triangle',
+        'receipts.Receipt': 'fas fa-file-invoice',
+        'notifications.Notification': 'fas fa-bell',
+        'activity_logs.ActivityLog': 'fas fa-history',
+    },
+    'related_modal_active': False,
+    'changeform_format': 'horizontal_tabs',
+    'show_ui_builder': False,
+}
+
+JAZZMIN_UI_TWEAKS = {
+    'theme': 'litera',
+    'dark_mode_theme': 'darkly',
+    'navbar': 'navbar-dark navbar-olive',
+    'brand_colour': 'navbar-olive',
+    'accent': 'accent-orange',
+    'sidebar': 'sidebar-dark-olive',
+    'no_navbar_border': True,
+    'navbar_fixed': True,
+    'sidebar_fixed': True,
+    'actions_sticky_top': True,
+    'body_small_text': False,
+    'sidebar_nav_small_text': True,
+    'sidebar_disable_expand': False,
+    'sidebar_nav_child_indent': True,
+    'sidebar_nav_compact_style': True,
+    'footer_small_text': True,
+    'button_classes': {
+        'primary': 'btn-success',
+        'secondary': 'btn-outline-dark',
+        'info': 'btn-info',
+        'warning': 'btn-warning',
+        'danger': 'btn-danger',
+        'success': 'btn-success',
+    },
+}
+
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
 
@@ -121,9 +203,12 @@ ROOT_URLCONF = 'vyapar_margadarshan.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
+            'libraries': {
+                'admin_dashboard': 'activity_logs.templatetags.admin_dashboard',
+            },
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',

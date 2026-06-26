@@ -6,37 +6,52 @@ export const api = axios.create({
   baseURL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: false,
-  // A hung request (backend down, CORS, dropped socket) should never
-  // pin a page on its loading state. 10s is generous for this app.
-  timeout: 10000,
+  timeout: 10000, // 10s – generous for this app
 });
 
 let accessToken = null;
 export const setAccessToken = (t) => { accessToken = t; };
 export const getAccessToken = () => accessToken;
 
+// Request interceptor – adds auth token and organization header.
 api.interceptors.request.use((config) => {
-  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  // Add organization ID from stored auth state.
   try {
     const stored = JSON.parse(localStorage.getItem('bk.auth.v1') || 'null');
     const orgId = stored?.organization?.id;
-    if (orgId) config.headers['X-Organization-Id'] = String(orgId);
+    const explicitOrgHeader =
+      config.headers?.['X-Organization-Id'] ||
+      config.headers?.['X-Organization-ID'] ||
+      config.headers?.['x-organization-id'] ||
+      (typeof config.headers?.get === 'function' &&
+        (config.headers.get('X-Organization-Id') || config.headers.get('X-Organization-ID')));
+    if (orgId && !explicitOrgHeader) {
+      config.headers['X-Organization-Id'] = String(orgId);
+    }
   } catch {
     // Ignore malformed local auth state; the auth context will clear it.
   }
+
   return config;
 });
 
 let onUnauthorized = null;
 export const setOnUnauthorized = (fn) => { onUnauthorized = fn; };
 
+// Response interceptor – handles 401 errors.
 api.interceptors.response.use(
-  (r) => r,
-  async (err) => {
-    if (err?.response?.status === 401) {
-      if (onUnauthorized) onUnauthorized();
+  (response) => response,
+  async (error) => {
+    if (error?.response?.status === 401) {
+      if (onUnauthorized) {
+        onUnauthorized();
+      }
     }
-    return Promise.reject(err);
+    return Promise.reject(error);
   }
 );
 

@@ -1,27 +1,69 @@
 import { cn } from '../../lib/utils.js';
+import { ArrowLeft } from 'lucide-react';
+import Button from '../../components/Button.jsx'; // fixed import
 
 /**
  * PageHeader — the masthead of a working page.
- *
- * No eyebrow above the title. The title is the title. The only supporting
- * element is an optional byline (a single line of muted text below) and
- * a row of actions on the right.
- *
- * On the Dashboard this is replaced with a custom editorial header, but the
- * pattern stays the same.
+ * - Title is the primary element.
+ * - Optional byline above the title.
+ * - Optional lede (description) below.
+ * - Actions on the right (e.g., Add button).
+ * - Optional `back` button for detail pages.
  */
-export function PageHeader({ title, byline, actions, className, lede, children }) {
+export function PageHeader({
+  title,
+  byline,
+  lede,
+  actions,
+  className,
+  children,
+  back,
+  onBack,
+  compact = false,
+}) {
   return (
-    <header className={cn('px-4 py-3 sm:px-5 sm:py-3 border-b border-rule bg-paper', className)}>
-      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          {byline && <p className="text-micro uppercase tracking-eyebrow text-ink-muted mb-0.5">{byline}</p>}
-          <h1 className="font-display text-2xl sm:text-[1.875rem] font-medium text-ink leading-[1.12] tracking-tight">
-            {title}
-          </h1>
-          {lede && <p className="mt-1 text-sm text-ink-muted max-w-2xl leading-snug">{lede}</p>}
+    <header
+      className={cn(
+        'border-b border-rule bg-paper',
+        compact ? 'px-3 py-2 sm:px-4 sm:py-2' : 'px-4 py-3 sm:px-5 sm:py-3',
+        className
+      )}
+    >
+      <div className={cn(
+        'flex flex-col items-stretch sm:flex-row sm:items-center sm:justify-between',
+        compact ? 'gap-2' : 'gap-3'
+      )}>
+        <div className={cn('min-w-0 flex items-center', compact ? 'gap-2' : 'gap-3')}>
+          {back && (
+            <Button
+              variant="ghost"
+              size="sm"
+              iconLeft={<ArrowLeft size={16} />}
+              onClick={onBack}
+              className="shrink-0 -ml-1"
+            >
+              Back
+            </Button>
+          )}
+          <div>
+            {byline && <p className={cn('text-micro uppercase tracking-eyebrow text-ink-muted', compact ? 'mb-0' : 'mb-0.5')}>{byline}</p>}
+            <h1 className={cn(
+              'font-display font-medium text-ink leading-[1.12] tracking-tight',
+              compact ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-[1.875rem]'
+            )}>
+              {title}
+            </h1>
+            {lede && <p className={cn(
+              'text-ink-muted max-w-2xl leading-snug',
+              compact ? 'mt-0.5 text-xs sm:text-sm' : 'mt-1 text-sm'
+            )}>{lede}</p>}
+          </div>
         </div>
-        {actions && <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">{actions}</div>}
+        {actions && (
+          <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
+            {actions}
+          </div>
+        )}
       </div>
       {children}
     </header>

@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Edit3, FileText, Plus, Receipt, RefreshCw, Search, XCircle } from 'lucide-react';
 import api from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Panel, PanelHeader, PanelTitle } from '../components/Panel.jsx';
-import { PageHeader } from '../components/PageHeader.jsx';
 import { Avatar } from '../components/Avatar.jsx';
 import { formatDate } from '../lib/date.js';
 import { EmptyState, ErrorState, Spinner } from '../components/Feedback.jsx';
@@ -23,25 +22,18 @@ const VERB_ICON = {
   reimbursed: CheckCircle2,
 };
 
-const roleLabel = (role) => {
-  const normalized = String(role ?? '').toUpperCase();
-  if (normalized === 'OWNER') return 'Owner activity trail';
-  if (normalized === 'STAFF') return 'Staff activity view';
-  return 'Workspace activity trail';
-};
-
 const normalizeVerb = (row) => {
   const action = row?.action_type ?? row?.action ?? row?.verb;
   if (!action) return 'created';
   return String(action).toLowerCase();
 };
 const actorName = (row) => (
-  row?.user_name
-  ?? row?.user_email
-  ?? row?.actor_name
-  ?? row?.actor?.username
-  ?? row?.user?.username
-  ?? 'Someone'
+  row?.user_name ??
+  row?.user_email ??
+  row?.actor_name ??
+  row?.actor?.username ??
+  row?.user?.username ??
+  'Someone'
 );
 const objectText = (row) => row?.description ?? row?.object_repr ?? row?.target ?? 'an expense';
 const eventTime = (row) => row?.timestamp ?? row?.created_at ?? row?.date ?? null;
@@ -70,7 +62,7 @@ const eventTone = (verb) => {
 };
 
 export default function Activity() {
-  const { currency, role, organization } = useAuth();
+  const { currency } = useAuth();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -80,7 +72,7 @@ export default function Activity() {
   const activityPageSize = 15;
   const [activityPage, setActivityPage] = useState(1);
 
-  const loadActivity = () => {
+  const loadActivity = useCallback(() => {
     setLoading(true);
     setLoadError('');
     api.get('/activity-logs/', { params: { page_size: 100 } })
@@ -93,9 +85,9 @@ export default function Activity() {
         setLoadError('Activity logs could not be loaded. No workspace data was changed.');
       })
       .finally(() => setLoading(false));
-  };
+  }, []);
 
-  useEffect(() => { loadActivity(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadActivity(); }, [loadActivity]);
 
   useEffect(() => {
     setActivityPage(1);
@@ -164,22 +156,23 @@ export default function Activity() {
     setQ('');
     setVerbFilter('');
   };
+  const pageActions = useMemo(
+    () => (
+      <Button variant="secondary" size="sm" iconLeft={<RefreshCw size={14} />} onClick={loadActivity} disabled={loading}>
+        Refresh
+      </Button>
+    ),
+    [loadActivity, loading],
+  );
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-3 sm:px-6 sm:py-4 lg:px-10">
-      <PageHeader
-        byline={`${roleLabel(role)}${organization?.name ? ` - ${organization.name}` : ''}`}
-        title="Activity"
-        lede="Review recent workspace activity."
-        actions={
-          <Button variant="secondary" size="sm" iconLeft={<RefreshCw size={14} />} onClick={loadActivity} disabled={loading}>
-            Refresh
-          </Button>
-        }
-      />
+      <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5 border-b border-rule pb-2" aria-label="Activity actions">
+        {pageActions}
+      </div>
 
       {!loading && !loadError && normalizedRows.length > 0 && (
-        <section className="mt-4 border-t border-rule pt-3" aria-label="Activity summary">
+        <section className="border-t border-rule pt-3" aria-label="Activity summary">
           <p className="text-sm font-medium text-ink">Summary</p>
           <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryMetric label="Shown" value={filteredRows.length} helper={`${normalizedRows.length} loaded`} />

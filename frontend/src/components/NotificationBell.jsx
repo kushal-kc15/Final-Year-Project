@@ -4,12 +4,11 @@ import { Bell, Check } from 'lucide-react';
 import api from '../lib/api.js';
 import { formatDate } from '../lib/date.js';
 import { cn } from '../lib/utils.js';
-import { Spinner } from './Feedback.jsx';
+import { Spinner, Skeleton } from './Feedback.jsx';
 
 const POLL_INTERVAL = 30000;
 
 const notificationTime = (notification) => notification?.time_ago || formatDate(notification?.created_at, 'short');
-
 const notificationTitle = (notification) => notification?.title || 'Notification';
 const notificationMessage = (notification) => notification?.message || 'No details available.';
 
@@ -37,6 +36,7 @@ export function NotificationBell() {
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [markAllLoading, setMarkAllLoading] = useState(false);
 
+  // Load unread count with polling
   useEffect(() => {
     let cancelled = false;
 
@@ -70,8 +70,10 @@ export function NotificationBell() {
     };
   }, []);
 
+  // Close on click outside
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open) return;
+
     const onClick = (event) => {
       if (ref.current && !ref.current.contains(event.target)) setOpen(false);
     };
@@ -83,6 +85,7 @@ export function NotificationBell() {
     let cancelled = false;
     setLoading(true);
     setError('');
+
     return api.get('/notifications/recent/')
       .then((response) => {
         if (cancelled || !mounted.current) return null;
@@ -104,9 +107,8 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open) return;
     loadRecent();
-    return undefined;
   }, [open, loadRecent]);
 
   const navigateSafely = (url) => {
@@ -123,11 +125,14 @@ export function NotificationBell() {
     try {
       const response = await api.post(`/notifications/${notification.id}/mark_read/`);
       const updated = response.data ?? notification;
-      setNotifications((current) => current.map((item) => (
-        item.id === notification.id ? { ...item, ...updated, is_read: true } : item
-      )));
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notification.id ? { ...item, ...updated, is_read: true } : item
+        )
+      );
       setUnreadCount((current) => Math.max(0, current - (notification.is_read ? 0 : 1)));
       await loadRecent();
+
       if (updated.action_url ?? notification.action_url) {
         navigateSafely(updated.action_url ?? notification.action_url);
       }
@@ -147,7 +152,9 @@ export function NotificationBell() {
     try {
       await api.post('/notifications/mark_all_read/');
       setUnreadCount(0);
-      setNotifications((current) => current.map((item) => ({ ...item, is_read: true })));
+      setNotifications((current) =>
+        current.map((item) => ({ ...item, is_read: true }))
+      );
       await loadRecent();
     } catch {
       if (mounted.current) setError('Could not mark notifications as read.');
@@ -185,7 +192,7 @@ export function NotificationBell() {
               type="button"
               onClick={markAllRead}
               disabled={markAllLoading || unreadCount === 0}
-              className="inline-flex items-center gap-1 text-xs font-medium text-ink-soft hover:text-ink disabled:text-ink-faint disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1 text-xs font-medium text-ink-soft hover:text-ink disabled:text-ink-faint disabled:cursor-not-allowed transition-colors"
             >
               {markAllLoading ? <Spinner size={12} /> : <Check size={13} strokeWidth={1.5} />}
               Mark all read
@@ -194,9 +201,17 @@ export function NotificationBell() {
 
           <div className="max-h-[28rem] overflow-y-auto">
             {loading ? (
-              <div className="py-10 flex flex-col items-center justify-center gap-2 text-sm text-ink-muted">
-                <Spinner className="text-ink-muted" />
-                <span>Loading notifications...</span>
+              <div className="px-4 py-3 space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-start gap-2.5">
+                    <Skeleton className="h-1.5 w-1.5 rounded-full mt-1.5" />
+                    <div className="flex-1 space-y-1.5">
+                      <Skeleton className="h-3 w-3/4" />
+                      <Skeleton className="h-2.5 w-1/2" />
+                      <Skeleton className="h-2 w-1/3" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : error ? (
               <div className="px-4 py-6 text-sm text-cinnabar-700">
@@ -225,19 +240,31 @@ export function NotificationBell() {
                         )}
                       >
                         <div className="flex items-start gap-2.5">
-                          <span className={cn(
-                            'mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full',
-                            unread ? 'bg-cinnabar-500' : 'bg-ink-faint'
-                          )} aria-hidden="true" />
+                          <span
+                            className={cn(
+                              'mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full',
+                              unread ? 'bg-cinnabar-500' : 'bg-ink-faint'
+                            )}
+                            aria-hidden="true"
+                          />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-2">
-                              <p className={cn('text-sm font-medium truncate', unread ? 'text-ink' : 'text-ink-soft')}>
+                              <p
+                                className={cn(
+                                  'text-sm font-medium truncate',
+                                  unread ? 'text-ink' : 'text-ink-soft'
+                                )}
+                              >
                                 {notificationTitle(notification)}
                               </p>
                               {busy && <Spinner size={12} className="text-ink-muted shrink-0 mt-0.5" />}
                             </div>
-                            <p className="mt-0.5 text-xs text-ink-muted break-words">{notificationMessage(notification)}</p>
-                            <p className="mt-1.5 text-[11px] text-ink-faint num">{notificationTime(notification)}</p>
+                            <p className="mt-0.5 text-xs text-ink-muted break-words">
+                              {notificationMessage(notification)}
+                            </p>
+                            <p className="mt-1.5 text-[11px] text-ink-faint num">
+                              {notificationTime(notification)}
+                            </p>
                           </div>
                         </div>
                       </button>

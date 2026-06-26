@@ -1,7 +1,7 @@
 /**
- * Dev-only helper: log the current browser origin to the console so devs
- * can copy it straight into the OAuth client's "Authorized JavaScript origins"
- * list. No-op in production.
+ * Dev-only helper: logs the current browser origin so devs can copy it
+ * straight into the OAuth client's "Authorized JavaScript origins" list.
+ * No-op in production.
  */
 
 const DEV_ORIGINS = new Set([

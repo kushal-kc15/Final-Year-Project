@@ -1,11 +1,11 @@
 import { Ribbon } from './Badge.jsx';
 import { STATUS } from '../lib/date.js';
+import { cn } from '../lib/utils.js'; // <-- add this import
 
-/** Map the API status string to a Ribbon. */
 export function StatusPill({ status, className }) {
   const meta = STATUS[status] ?? { label: status ?? '—', tone: 'ink' };
   return (
-    <Ribbon tone={meta.tone} dot className={className}>
+    <Ribbon tone={meta.tone} dot className={cn('border border-rule/20', className)}>
       {meta.label}
     </Ribbon>
   );

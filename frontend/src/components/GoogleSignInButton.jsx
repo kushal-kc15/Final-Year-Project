@@ -6,7 +6,12 @@ import { warnIfOriginNotWhitelisted } from '../lib/oauthHint.js';
  * "Continue with Google" button. Renders nothing if VITE_GOOGLE_CLIENT_ID is
  * not configured so the login screen degrades gracefully.
  */
-export default function GoogleSignInButton({ onSuccess, onError, disabled = false, label = 'Continue with Google' }) {
+export default function GoogleSignInButton({
+  onSuccess,
+  onError,
+  disabled = false,
+  label = 'Continue with Google',
+}) {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const enabled = Boolean(clientId);
 
@@ -24,8 +29,6 @@ export default function GoogleSignInButton({ onSuccess, onError, disabled = fals
       }
     },
     onError: () => onError?.(new Error('Google sign-in failed.')),
-    // Skip Google-side init when the client ID is missing so the hook
-    // doesn't try to render an iframe against an empty client.
     disabled: !enabled,
   });
 
@@ -36,7 +39,7 @@ export default function GoogleSignInButton({ onSuccess, onError, disabled = fals
       type="button"
       onClick={() => login()}
       disabled={disabled}
-      className="w-full inline-flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm font-medium text-ink bg-paper border border-rule rounded-md hover:bg-paper-deep disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cinnabar-500/40"
+      className="w-full inline-flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm font-medium text-ink bg-paper border border-rule rounded-sm hover:bg-paper-deep disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cinnabar-500/40"
       aria-label="Sign in with Google"
     >
       <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">

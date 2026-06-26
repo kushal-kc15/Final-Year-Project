@@ -16,3 +16,7 @@ backend/.hypothesis/
 frontend/node_modules/
 frontend/dist/
 frontend/.env
+
+frontend1
+.agents
+frontend-modern

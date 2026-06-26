@@ -128,6 +128,68 @@ class AnalyticsEndpointTestCase(TestCase):
         self.assertEqual(response.data['total_spent'], 50.0)
         self.assertEqual(response.data['transaction_count'], 1)
 
+    def test_report_detail_owner_is_org_wide_approved_only(self):
+        Expense.objects.create(
+            organization=self.organization,
+            user=self.staff,
+            title='Rejected report detail',
+            amount=Decimal('35.00'),
+            category='OTHER',
+            vendor='Rejected Vendor',
+            date=date.today(),
+            status='REJECTED',
+        )
+        self.authenticate(self.owner)
+
+        response = self.client.get('/api/analytics/report-detail/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['scope'], 'organization')
+        self.assertEqual(response.data['summary']['total'], 150.0)
+        self.assertEqual(response.data['summary']['count'], 2)
+        titles = {row['title'] for row in response.data['expenses']}
+        self.assertEqual(titles, {'Owner lunch', 'Staff taxi'})
+        self.assertEqual(response.data['top_category']['category'], 'FOOD')
+        self.assertEqual(response.data['top_vendor']['vendor'], 'Cafe A')
+
+    def test_report_detail_staff_is_own_approved_only(self):
+        self.authenticate(self.staff)
+
+        response = self.client.get('/api/analytics/report-detail/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['scope'], 'personal')
+        self.assertEqual(response.data['summary']['total'], 50.0)
+        self.assertEqual(response.data['summary']['count'], 1)
+        self.assertEqual(response.data['expenses'][0]['title'], 'Staff taxi')
+        self.assertEqual(response.data['expenses'][0]['user_id'], self.staff.id)
+
+    def test_report_detail_excludes_cross_org_data(self):
+        self.authenticate(self.other_owner)
+
+        response = self.client.get('/api/analytics/report-detail/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['organization_id'], self.other_organization.id)
+        self.assertEqual(response.data['summary']['total'], 900.0)
+        self.assertEqual(response.data['summary']['count'], 1)
+        self.assertEqual(response.data['expenses'][0]['title'], 'Other org expense')
+
+    def test_report_detail_applies_category_vendor_and_date_filters(self):
+        today = date.today().isoformat()
+        self.authenticate(self.owner)
+
+        response = self.client.get(
+            f'/api/analytics/report-detail/?start_date={today}&end_date={today}&category=TRANSPORT&vendor=Taxi'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['summary']['total'], 50.0)
+        self.assertEqual(response.data['summary']['count'], 1)
+        self.assertEqual(response.data['filters']['category'], 'TRANSPORT')
+        self.assertEqual(response.data['filters']['vendor'], 'Taxi')
+        self.assertEqual(response.data['expenses'][0]['title'], 'Staff taxi')
+
     def test_spending_trends_validates_period_and_date_range(self):
         self.authenticate(self.owner)
 
@@ -232,6 +294,21 @@ class AnalyticsEndpointTestCase(TestCase):
         trend_header_index = rows.index(['Period', 'Period start', 'Total spend', 'Count'])
         self.assertEqual(rows[trend_header_index + 1][0], date.today().strftime('%b %Y'))
         self.assertEqual(rows[trend_header_index + 1][1], date.today().replace(day=1).isoformat())
+
+    def test_export_csv_applies_category_vendor_filters_and_included_expenses(self):
+        self.authenticate(self.owner)
+
+        response = self.client.get('/api/analytics/export-csv/?category=TRANSPORT&vendor=Taxi')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        content = response.content.decode('utf-8-sig')
+        rows = list(csv.reader(io.StringIO(content)))
+        self.assertIn(['Category filter', 'Transportation'], rows)
+        self.assertIn(['Vendor filter', 'Taxi'], rows)
+        self.assertIn(['Approved amount', '50.00'], rows)
+        self.assertIn(['Approved Expenses Included'], rows)
+        self.assertIn('Staff taxi', content)
+        self.assertNotIn('Owner lunch', content)
 
     def test_export_csv_protects_formula_like_text(self):
         Expense.objects.create(

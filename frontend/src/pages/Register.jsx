@@ -6,6 +6,7 @@ import Button from "../components/Button.jsx";
 import { Input } from "../components/Field.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useToast } from "../components/Toast.jsx";
+import { getInviteLoginPath, storePendingInviteToken } from "../lib/inviteFlow.js";
 
 export default function Register() {
   const { register } = useAuth();
@@ -21,6 +22,7 @@ export default function Register() {
     password2: "",
   });
   const [errors, setErrors] = useState({});
+  const [existingAccountInvite, setExistingAccountInvite] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [showPw, setShowPw] = useState(false);
@@ -45,6 +47,7 @@ export default function Register() {
   const submit = async (e) => {
     e.preventDefault();
     setErrors({});
+    setExistingAccountInvite(false);
 
     const next = {};
     if (!form.full_name.trim()) next.full_name = "Tell us your name";
@@ -61,8 +64,8 @@ export default function Register() {
 
     setLoading(true);
     try {
+      if (inviteToken) storePendingInviteToken(inviteToken);
       await register({
-        username: form.email.trim().toLowerCase().split("@")[0],
         first_name: form.full_name.trim().split(/\s+/)[0] ?? "",
         last_name: form.full_name.trim().trim().split(/\s+/).slice(1).join(" "),
         email: form.email.trim().toLowerCase(),
@@ -85,8 +88,24 @@ export default function Register() {
         Object.entries(data).forEach(([k, v]) => {
           fieldErrs[k] = Array.isArray(v) ? v[0] : String(v);
         });
+        const duplicateInviteEmail = Boolean(
+          inviteToken
+          && fieldErrs.email
+          && fieldErrs.email.includes("An account with this email already exists")
+        );
+        if (duplicateInviteEmail) {
+          fieldErrs.email = "An account with this email already exists. Please sign in to accept the invitation.";
+          setExistingAccountInvite(true);
+        }
         setErrors(fieldErrs);
-        toast.error(fieldErrs.detail || "Please check the form.");
+        const firstError = fieldErrs.email
+          || fieldErrs.password
+          || fieldErrs.password2
+          || fieldErrs.invite_token
+          || fieldErrs.detail
+          || fieldErrs.error
+          || Object.values(fieldErrs)[0];
+        toast.error(firstError || "Please check the form.");
       } else {
         toast.error("Something went wrong. Try again.");
       }
@@ -101,7 +120,7 @@ export default function Register() {
         <Link to="/">
           <Logo size={28} withWordmark wordmarkSize="lg" />
         </Link>
-        <Link to="/login" className="text-sm text-ink-soft hover:text-ink">
+        <Link to="/login" className="text-sm text-ink-soft hover:text-ink transition-colors">
           Already have an account?{" "}
           <span className="text-cinnabar-600 font-medium">Sign in</span>
         </Link>
@@ -159,7 +178,7 @@ export default function Register() {
                 <button
                   type="button"
                   onClick={() => setShowPw((s) => !s)}
-                  className="inline-flex items-center justify-center text-ink-muted hover:text-ink w-7 h-7 rounded-full"
+                  className="inline-flex items-center justify-center text-ink-muted hover:text-ink w-7 h-7 rounded-full transition-colors"
                   aria-label={showPw ? "Hide password" : "Show password"}
                 >
                   {showPw ? (
@@ -184,7 +203,7 @@ export default function Register() {
                 <button
                   type="button"
                   onClick={() => setShowPw2((s) => !s)}
-                  className="inline-flex items-center justify-center text-ink-muted hover:text-ink w-7 h-7 rounded-full"
+                  className="inline-flex items-center justify-center text-ink-muted hover:text-ink w-7 h-7 rounded-full transition-colors"
                   aria-label={showPw2 ? "Hide password" : "Show password"}
                 >
                   {showPw2 ? (
@@ -211,6 +230,21 @@ export default function Register() {
                   </li>
                 ))}
               </ul>
+            )}
+
+            {existingAccountInvite && inviteToken && (
+              <div className="rounded-sm border border-saffron-200 bg-saffron-50 px-3 py-3 text-sm text-saffron-800">
+                <p>You already have an account. Sign in to accept this invitation.</p>
+                <Button
+                  as={Link}
+                  to={getInviteLoginPath(inviteToken)}
+                  variant="secondary"
+                  size="sm"
+                  className="mt-3 w-full"
+                >
+                  Sign in to accept invitation
+                </Button>
+              </div>
             )}
 
             <Button

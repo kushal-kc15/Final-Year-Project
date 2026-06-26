@@ -24,7 +24,9 @@ import Settings from "./pages/Settings.jsx";
 export default function App() {
   return (
     <Routes>
+      {/* Public routes */}
       <Route path="/" element={<Landing />} />
+
       <Route
         path="/login"
         element={
@@ -41,8 +43,10 @@ export default function App() {
           </PublicOnly>
         }
       />
+
       <Route path="/verify-email/:token" element={<VerifyEmail />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
+
       <Route
         path="/forgot-password"
         element={
@@ -67,8 +71,12 @@ export default function App() {
           </PublicOnly>
         }
       />
+
+      {/* Invite flows */}
       <Route path="/accept-invite/:token" element={<AcceptInvite />} />
       <Route path="/invite" element={<AcceptInvite />} />
+
+      {/* Workspace setup – requires auth but not an org yet */}
       <Route
         path="/workspace/start"
         element={
@@ -86,6 +94,7 @@ export default function App() {
         }
       />
 
+      {/* Protected – requires auth + organization */}
       <Route
         element={
           <ProtectedRoute>
@@ -95,6 +104,8 @@ export default function App() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/expenses" element={<Expenses />} />
+
+        {/* Owner-only routes */}
         <Route
           path="/approvals"
           element={
@@ -129,16 +140,15 @@ export default function App() {
         />
         <Route
           path="/team"
-          element={
-            <ProtectedRoute roles={["OWNER", "Owner"]}>
-              <Team />
-            </ProtectedRoute>
-          }
+          element={<Team />}
         />
+
+        {/* Accessible to all roles */}
         <Route path="/activity" element={<Activity />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
 
+      {/* 404 – redirect to landing */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

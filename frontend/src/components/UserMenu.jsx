@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../lib/api.js';
 import { Avatar } from './Avatar.jsx';
 import { cn } from '../lib/utils.js';
+import Badge from './Badge.jsx';
 
 export function UserMenu() {
   const { user, logout, role } = useAuth();
@@ -38,15 +39,17 @@ export function UserMenu() {
         <span className="hidden sm:inline max-w-[140px] truncate font-medium text-ink">
           {user?.full_name ?? user?.email ?? 'Account'}
         </span>
-        <ChevronDown size={14} className={cn('text-ink-muted transition-transform', open && 'rotate-180')} strokeWidth={1.5} />
+        <ChevronDown size={14} className={cn('text-ink-muted transition-transform duration-200', open && 'rotate-180')} strokeWidth={1.5} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-64 max-w-[calc(100vw-1.5rem)] bg-paper border border-rule rounded-md shadow-lift overflow-hidden animate-drawer">
+        <div className="absolute right-0 top-full mt-1 z-50 w-64 max-w-[calc(100vw-1.5rem)] bg-paper border border-rule rounded-md shadow-lift overflow-hidden animate-drawer origin-top-right">
           <div className="px-3 py-2.5 border-b border-rule">
             <p className="text-sm font-medium text-ink truncate">{user?.full_name ?? '—'}</p>
             <p className="text-xs text-ink-muted truncate">{user?.email}</p>
             {role && (
-              <p className="mt-1.5 text-micro uppercase tracking-eyebrow text-cinnabar-600">{role}</p>
+              <Badge tone="cinnabar" className="mt-1.5 text-[10px] px-2 py-0.5">
+                {role}
+              </Badge>
             )}
           </div>
           <ul className="py-1">

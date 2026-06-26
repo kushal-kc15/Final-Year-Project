@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+import re
 
 User = get_user_model()
 
@@ -38,9 +39,31 @@ class RegisterSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'password2', 
+        fields = ['email', 'password', 'password2',
                   'business_name', 'phone_number', 'first_name', 'last_name']
-    
+
+    def _generate_username(self, email):
+        local_part = (email or '').split('@')[0].strip().lower()
+        base = re.sub(r'[^a-z0-9_.+-]+', '_', local_part).strip('._-+')
+        if not base:
+            base = 'user'
+        base = base[:140]
+
+        username = base
+        suffix = 1
+        while User.objects.filter(username=username).exists():
+            username = f"{base}_{suffix}"
+            suffix += 1
+        return username
+
+    def validate_email(self, value):
+        email = (value or '').strip().lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError(
+                'An account with this email already exists. Please sign in.'
+            )
+        return email
+
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError(
@@ -50,5 +73,6 @@ class RegisterSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         validated_data.pop('password2')
+        validated_data['username'] = self._generate_username(validated_data.get('email'))
         user = User.objects.create_user(**validated_data)
         return user

@@ -1,6 +1,7 @@
 import { cn } from '../../lib/utils.js';
+import { Inbox } from 'lucide-react';
 
-/** Spinner — used inside buttons during async work. */
+/** Spinner — used inside buttons or as a loading indicator. */
 export function Spinner({ className, size = 14 }) {
   return (
     <svg
@@ -16,7 +17,7 @@ export function Spinner({ className, size = 14 }) {
   );
 }
 
-/** Skeleton block. The hairline-ruled background makes them blend in. */
+/** Skeleton block – shimmer animation. */
 export function Skeleton({ className, ...rest }) {
   return (
     <div
@@ -31,15 +32,19 @@ export function Skeleton({ className, ...rest }) {
   );
 }
 
-/** Empty state — teach the interface, not "nothing here." */
-export function EmptyState({ title, description, icon: Icon, action, className }) {
+/** Empty state – teach the interface, not "nothing here." */
+export function EmptyState({
+  title,
+  description,
+  icon: Icon = Inbox,
+  action,
+  className,
+}) {
   return (
     <div className={cn('flex flex-col items-center justify-center text-center px-6 py-10', className)}>
-      {Icon && (
-        <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-pill border border-rule bg-paper-deep text-ink-muted">
-          <Icon size={18} strokeWidth={1.5} />
-        </div>
-      )}
+      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full border border-rule bg-paper-deep text-ink-muted">
+        <Icon size={18} strokeWidth={1.5} />
+      </div>
       <h4 className="font-display text-lg font-medium text-ink">{title}</h4>
       {description && <p className="mt-1.5 max-w-md text-sm text-ink-muted leading-relaxed">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
@@ -47,10 +52,7 @@ export function EmptyState({ title, description, icon: Icon, action, className }
   );
 }
 
-/**
- * LoadingState — lightweight, no API coupling.
- * Prefer Skeleton for content regions; keep simple spinner fallback.
- */
+/** LoadingState – lightweight wrapper. */
 export function LoadingState({ className, message = 'Loading…', showSpinner = true }) {
   return (
     <div className={cn('flex flex-col items-center justify-center text-center px-6 py-10', className)}>
@@ -60,9 +62,7 @@ export function LoadingState({ className, message = 'Loading…', showSpinner = 
   );
 }
 
-/**
- * ErrorState — show an interface-safe error with optional retry action.
- */
+/** ErrorState – uses EmptyState with a danger icon. */
 export function ErrorState({
   className,
   title = 'Something went wrong',
@@ -75,6 +75,13 @@ export function ErrorState({
       title={title}
       description={description}
       action={action}
+      icon={({ size, ...props }) => (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width={size} height={size} {...props}>
+          <circle cx="12" cy="12" r="10" stroke="currentColor" />
+          <path d="M12 8v5" stroke="currentColor" strokeLinecap="round" />
+          <circle cx="12" cy="16" r="0.5" fill="currentColor" />
+        </svg>
+      )}
     />
   );
 }

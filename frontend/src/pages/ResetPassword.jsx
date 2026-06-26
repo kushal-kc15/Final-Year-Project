@@ -90,7 +90,7 @@ export default function ResetPassword() {
         <Link to="/">
           <Logo size={28} withWordmark wordmarkSize="lg" />
         </Link>
-        <Link to="/login" className="text-sm text-ink-soft hover:text-ink">
+        <Link to="/login" className="text-sm text-ink-soft hover:text-ink transition-colors">
           Back to sign in
         </Link>
       </header>
@@ -117,7 +117,7 @@ export default function ResetPassword() {
                 <Button as={Link} to="/login" variant="primary" size="lg" className="w-full">
                   Back to sign in
                 </Button>
-                <Link to="/forgot-password" className="text-sm text-ink-muted hover:text-ink">
+                <Link to="/forgot-password" className="text-sm text-ink-muted hover:text-ink transition-colors">
                   Request a new reset link
                 </Link>
               </div>
@@ -149,7 +149,7 @@ export default function ResetPassword() {
                     <button
                       type="button"
                       onClick={() => setShowPw((s) => !s)}
-                      className="inline-flex items-center justify-center text-ink-muted hover:text-ink w-7 h-7 rounded-full"
+                      className="inline-flex items-center justify-center text-ink-muted hover:text-ink w-7 h-7 rounded-full transition-colors"
                       aria-label={showPw ? 'Hide password' : 'Show password'}
                     >
                       {showPw ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
@@ -185,7 +185,7 @@ export default function ResetPassword() {
                     <button
                       type="button"
                       onClick={() => setShowPw2((s) => !s)}
-                      className="inline-flex items-center justify-center text-ink-muted hover:text-ink w-7 h-7 rounded-full"
+                      className="inline-flex items-center justify-center text-ink-muted hover:text-ink w-7 h-7 rounded-full transition-colors"
                       aria-label={showPw2 ? 'Hide password' : 'Show password'}
                     >
                       {showPw2 ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
@@ -207,7 +207,7 @@ export default function ResetPassword() {
                 </Button>
 
                 <div className="flex items-center justify-center pt-1">
-                  <Link to="/login" className="text-sm text-ink-muted hover:text-ink">
+                  <Link to="/login" className="text-sm text-ink-muted hover:text-ink transition-colors">
                     Back to sign in
                   </Link>
                 </div>

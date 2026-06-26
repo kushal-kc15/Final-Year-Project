@@ -60,9 +60,10 @@ class ExpenseViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-            if expense.status != 'PENDING':
+            original_status = expense.status
+            if original_status not in {'PENDING', 'REJECTED'}:
                 return Response(
-                    {'error': 'Only pending expenses can be edited.'},
+                    {'error': 'Only pending or rejected expenses can be edited.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -73,6 +74,38 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             )
             serializer.is_valid(raise_exception=True)
             self.perform_update(serializer)
+            expense = serializer.instance
+
+            if original_status == 'REJECTED':
+                expense.status = 'PENDING'
+                expense.reviewed_by = None
+                expense.reviewed_at = None
+                expense.rejection_reason = ''
+                expense.save(update_fields=[
+                    'status',
+                    'reviewed_by',
+                    'reviewed_at',
+                    'rejection_reason',
+                    'updated_at',
+                ])
+
+                member = get_active_membership(request.user, request)
+                if member:
+                    log_activity(
+                        organization=member.organization,
+                        user=request.user,
+                        action_type='EXPENSE_UPDATED',
+                        description=(
+                            f"{request.user.get_full_name()} resubmitted expense: "
+                            f"{expense.title} (रू {expense.amount})"
+                        ),
+                        metadata={'expense_id': expense.id, 'status': 'PENDING'}
+                    )
+                    owners = OrganizationMember.objects.filter(
+                        organization=member.organization,
+                        role='OWNER'
+                    )
+                    notify_pending_approval(owners, expense)
 
             if getattr(expense, '_prefetched_objects_cache', None):
                 expense._prefetched_objects_cache = {}

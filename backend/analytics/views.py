@@ -101,6 +101,32 @@ def apply_date_filters(queryset, request):
     return queryset, start_date, end_date
 
 
+def apply_report_filters(queryset, request):
+    queryset, start_date, end_date = apply_date_filters(queryset, request)
+    category = request.query_params.get('category')
+    vendor = (request.query_params.get('vendor') or '').strip()
+
+    if category:
+        valid_categories = {value for value, _label in Expense.CATEGORY_CHOICES}
+        category = category.upper()
+        if category not in valid_categories:
+            raise ValidationError({'category': 'Use a valid expense category.'})
+        queryset = queryset.filter(category=category)
+
+    if vendor:
+        queryset = queryset.filter(vendor__icontains=vendor)
+
+    return queryset, start_date, end_date, category, vendor
+
+
+def apply_category_vendor_filters(queryset, category='', vendor=''):
+    if category:
+        queryset = queryset.filter(category=category)
+    if vendor:
+        queryset = queryset.filter(vendor__icontains=vendor)
+    return queryset
+
+
 def parse_limit(request, default=10, maximum=50):
     raw_limit = request.query_params.get('limit', default)
     try:
@@ -123,11 +149,19 @@ def parse_positive_int(request, name, default, maximum):
     return min(value, maximum)
 
 
+def parse_period(request):
+    period = request.query_params.get('period', 'daily')
+    if period not in PERIOD_TRUNCATORS:
+        raise ValidationError({'period': 'Use daily, weekly, or monthly.'})
+    return period
+
+
 def summarize_queryset(queryset):
-    summary = queryset.aggregate(total=Sum('amount'), count=Count('id'))
+    summary = queryset.aggregate(total=Sum('amount'), count=Count('id'), average=Avg('amount'))
     return {
         'total': money(summary['total']),
         'count': summary['count'] or 0,
+        'average': money(summary['average']),
     }
 
 
@@ -217,7 +251,9 @@ def severity_from_score(score):
 def build_expense_snapshot(expense):
     return {
         'expense_id': expense.id,
+        'id': expense.id,
         'title': expense.title,
+        'description': expense.description or '',
         'amount': money(expense.amount),
         'category': expense.category,
         'vendor': expense.vendor or '',
@@ -511,9 +547,7 @@ def detect_expense_anomalies(expense, base_queryset, *, amount_multiplier, minim
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def spending_trends(request):
-    period = request.query_params.get('period', 'daily')
-    if period not in PERIOD_TRUNCATORS:
-        raise ValidationError({'period': 'Use daily, weekly, or monthly.'})
+    period = parse_period(request)
 
     expenses, member = scoped_expenses(request)
     expenses, start_date, end_date = apply_date_filters(expenses, request)
@@ -547,12 +581,10 @@ def spending_trends(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def export_csv(request):
-    period = request.query_params.get('period', 'daily')
-    if period not in PERIOD_TRUNCATORS:
-        raise ValidationError({'period': 'Use daily, weekly, or monthly.'})
+    period = parse_period(request)
 
     expenses, member = scoped_expenses(request)
-    expenses, start_date, end_date = apply_date_filters(expenses, request)
+    expenses, start_date, end_date, category, vendor = apply_report_filters(expenses, request)
     summary = expenses.aggregate(total=Sum('amount'), count=Count('id'))
     total_amount = summary['total'] or Decimal('0')
     total_count = summary['count'] or 0
@@ -603,6 +635,9 @@ def export_csv(request):
     writer.writerow(['Generated at', generated_at])
     writer.writerow(['Currency', request.user.default_currency])
     writer.writerow(['Data scope', 'Approved expenses only'])
+    writer.writerow(['View scope', 'Organization' if member.role == 'OWNER' else 'Personal'])
+    writer.writerow(['Category filter', safe_csv_text(category_label(category)) if category else 'All categories'])
+    writer.writerow(['Vendor filter', safe_csv_text(vendor) if vendor else 'All vendors'])
     writer.writerow(['Approved amount', decimal_string(total_amount)])
     writer.writerow(['Total approved expenses', total_count])
     writer.writerow([
@@ -657,6 +692,20 @@ def export_csv(request):
             row['count'],
         ])
 
+    writer.writerow([])
+    writer.writerow(['Approved Expenses Included'])
+    writer.writerow(['Date', 'Title', 'Description', 'Category', 'Vendor', 'Submitted by', 'Amount'])
+    for expense in expenses.select_related('user').order_by('-date', '-created_at', '-id'):
+        writer.writerow([
+            expense.date.isoformat(),
+            safe_csv_text(expense.title),
+            safe_csv_text(expense.description),
+            safe_csv_text(category_label(expense.category)),
+            safe_csv_text(expense.vendor),
+            safe_csv_text(expense.user.get_full_name() or expense.user.username),
+            decimal_string(expense.amount),
+        ])
+
     return response
 
 
@@ -664,7 +713,7 @@ def export_csv(request):
 @permission_classes([IsAuthenticated])
 def category_breakdown(request):
     expenses, member = scoped_expenses(request)
-    expenses, start_date, end_date = apply_date_filters(expenses, request)
+    expenses, start_date, end_date, _category, _vendor = apply_report_filters(expenses, request)
     total_amount = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
     rows = expenses.values('category').annotate(
@@ -733,7 +782,7 @@ def period_comparison(request):
 @permission_classes([IsAuthenticated])
 def vendor_summary(request):
     expenses, member = scoped_expenses(request)
-    expenses, start_date, end_date = apply_date_filters(expenses, request)
+    expenses, start_date, end_date, _category, _vendor = apply_report_filters(expenses, request)
     limit = parse_limit(request)
 
     rows = expenses.exclude(vendor__isnull=True).exclude(vendor='').values('vendor').annotate(
@@ -818,7 +867,7 @@ def budget_burn_rate(request):
 @permission_classes([IsAuthenticated])
 def overview(request):
     expenses, member = scoped_expenses(request)
-    expenses, start_date, end_date = apply_date_filters(expenses, request)
+    expenses, start_date, end_date, _category, _vendor = apply_report_filters(expenses, request)
     summary = summarize_queryset(expenses)
     category_count = expenses.values('category').distinct().count()
     vendor_count = expenses.exclude(vendor__isnull=True).exclude(vendor='').values('vendor').distinct().count()
@@ -832,6 +881,117 @@ def overview(request):
         'transaction_count': summary['count'],
         'category_count': category_count,
         'vendor_count': vendor_count,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def report_detail(request):
+    period = parse_period(request)
+    base_expenses, member = scoped_expenses(request)
+    expenses, start_date, end_date, category, vendor = apply_report_filters(base_expenses, request)
+
+    summary = summarize_queryset(expenses)
+    total_amount = Decimal(str(summary['total']))
+
+    category_rows = list(
+        expenses.values('category').annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('-total', 'category')
+    )
+    categories = [
+        {
+            'category': row['category'],
+            'total': money(row['total']),
+            'count': row['count'],
+            'percentage': percent(row['total'], total_amount),
+        }
+        for row in category_rows
+    ]
+
+    vendor_rows = list(
+        expenses.exclude(vendor__isnull=True).exclude(vendor='').values('vendor').annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('-total', 'vendor')[:10]
+    )
+    vendors = [
+        {
+            'vendor': row['vendor'],
+            'total': money(row['total']),
+            'count': row['count'],
+            'percentage': percent(row['total'], total_amount),
+        }
+        for row in vendor_rows
+    ]
+
+    trunc_func = PERIOD_TRUNCATORS[period]
+    trends = [
+        {
+            'period': row['period_bucket'],
+            'period_start': row['period_bucket'],
+            'total': money(row['total']),
+            'count': row['count'],
+        }
+        for row in expenses.annotate(period_bucket=trunc_func('date')).values('period_bucket').annotate(
+            total=Sum('amount'),
+            count=Count('id'),
+        ).order_by('period_bucket')
+    ]
+
+    if start_date and end_date:
+        range_days = max((end_date - start_date).days + 1, 1)
+        current_start, current_end = start_date, end_date
+        previous_end = start_date - timedelta(days=1)
+        previous_start = previous_end - timedelta(days=range_days - 1)
+        period_type = 'selected_range'
+    else:
+        period_type = 'year' if period == 'monthly' else 'month'
+        current_start, current_end, previous_start, previous_end = current_and_previous_period(period_type)
+
+    comparison_base = apply_category_vendor_filters(base_expenses, category, vendor)
+    comparison = {
+        'period_type': period_type,
+        'current_period': {
+            'start': current_start,
+            'end': current_end,
+            **summarize_queryset(comparison_base.filter(date__gte=current_start, date__lte=current_end)),
+        },
+        'previous_period': {
+            'start': previous_start,
+            'end': previous_end,
+            **summarize_queryset(comparison_base.filter(date__gte=previous_start, date__lte=previous_end)),
+        },
+    }
+    comparison['change_percentage'] = period_change(
+        comparison['current_period']['total'],
+        comparison['previous_period']['total'],
+    )
+
+    expense_rows = [
+        build_expense_snapshot(expense)
+        for expense in expenses.select_related('user').order_by('-date', '-created_at', '-id')[:100]
+    ]
+
+    return Response({
+        'organization_id': member.organization_id,
+        'scope': 'organization' if member.role == 'OWNER' else 'personal',
+        'filters': {
+            'start_date': start_date,
+            'end_date': end_date,
+            'category': category or '',
+            'vendor': vendor,
+            'period': period,
+        },
+        'summary': summary,
+        'top_category': categories[0] if categories else None,
+        'top_vendor': vendors[0] if vendors else None,
+        'trends': trends,
+        'categories': categories,
+        'vendors': vendors,
+        'comparison': comparison,
+        'expenses': expense_rows,
     })
 
 

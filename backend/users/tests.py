@@ -18,10 +18,13 @@ User = get_user_model()
 class RegistrationWorkflowTestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
 
     def registration_payload(self, **overrides):
         payload = {
-            'username': 'newuser',
             'email': 'newuser@example.com',
             'password': 'StrongPass123!',
             'password2': 'StrongPass123!',
@@ -38,10 +41,52 @@ class RegistrationWorkflowTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = User.objects.get(email='newuser@example.com')
+        self.assertEqual(user.username, 'newuser')
         self.assertFalse(OrganizationMember.objects.filter(user=user).exists())
         self.assertEqual(response.data['memberships'], [])
         self.assertIsNone(response.data['active_organization'])
         self.assertIsNone(response.data['role'])
+
+    def test_register_without_username_succeeds_and_generates_username_from_email(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            self.registration_payload(email='kishmatkc5@gmail.com'),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(email='kishmatkc5@gmail.com')
+        self.assertEqual(user.username, 'kishmatkc5')
+
+    def test_register_username_collision_generates_numeric_suffix(self):
+        User.objects.create_user(
+            username='kishmatkc5',
+            email='existing@example.com',
+            password='StrongPass123!',
+        )
+
+        response = self.client.post(
+            '/api/auth/register/',
+            self.registration_payload(email='kishmatkc5@gmail.com'),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(email='kishmatkc5@gmail.com')
+        self.assertEqual(user.username, 'kishmatkc5_1')
+
+    def test_register_duplicate_email_fails_clearly(self):
+        User.objects.create_user(
+            username='existing',
+            email='newuser@example.com',
+            password='StrongPass123!',
+        )
+
+        response = self.client.post('/api/auth/register/', self.registration_payload())
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data['email'][0],
+            'An account with this email already exists. Please sign in.',
+        )
 
     def test_register_with_invite_links_user_to_organization(self):
         org = Organization.objects.create(name='Inviting Org')
@@ -62,7 +107,6 @@ class RegistrationWorkflowTestCase(TestCase):
         response = self.client.post(
             '/api/auth/register/',
             self.registration_payload(
-                username='invited',
                 email='invited@example.com',
                 invite_token=str(invitation.token),
             ),
@@ -70,6 +114,7 @@ class RegistrationWorkflowTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = User.objects.get(email='invited@example.com')
+        self.assertEqual(user.username, 'invited')
         member = OrganizationMember.objects.get(user=user)
         self.assertEqual(member.organization, org)
         self.assertEqual(member.role, 'STAFF')

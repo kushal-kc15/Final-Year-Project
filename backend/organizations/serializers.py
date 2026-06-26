@@ -8,7 +8,11 @@ class OrganizationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Organization
-        fields = ['id', 'name', 'description', 'member_count', 'created_at', 'updated_at']
+        fields = [
+            'id', 'name', 'description', 'legal_name', 'industry',
+            'registration_number', 'tax_id', 'contact_email', 'phone_number',
+            'address', 'city', 'country', 'member_count', 'created_at', 'updated_at'
+        ]
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_member_count(self, obj):

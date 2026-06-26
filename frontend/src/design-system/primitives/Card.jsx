@@ -1,14 +1,22 @@
 import { cn } from '../../lib/utils.js';
 
-/**
- * Card — simple surface container for content.
- * Generic and styling-light; supports `className` and `children`.
- */
-export function Card({ className, children, ...rest }) {
+export function Card({
+  className,
+  children,
+  variant = 'default',
+  ...rest
+}) {
+  const variants = {
+    default: 'border border-rule bg-paper shadow-sm',
+    elevated: 'border border-rule/50 bg-paper shadow-md',
+    outline: 'border border-rule bg-transparent shadow-none',
+  };
+
   return (
     <div
       className={cn(
-        'rounded-md border border-rule bg-paper shadow-sm',
+        'rounded-md p-4 transition-shadow duration-200',
+        variants[variant],
         className
       )}
       {...rest}

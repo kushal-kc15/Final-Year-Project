@@ -74,7 +74,7 @@ export default function VerifyEmail() {
         <Link to="/">
           <Logo size={28} withWordmark wordmarkSize="lg" />
         </Link>
-        <Link to="/login" className="text-sm text-ink-soft hover:text-ink">
+        <Link to="/login" className="text-sm text-ink-soft hover:text-ink transition-colors">
           Back to sign in
         </Link>
       </header>

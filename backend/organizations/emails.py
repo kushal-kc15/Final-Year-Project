@@ -19,6 +19,14 @@ def send_invitation_email(invitation, request=None):
         invitation: Invitation object
         request: HTTP request object (optional, not used - kept for compatibility)
     """
+    recipient_email = (invitation.email or '').strip().lower()
+    if not recipient_email:
+        logger.error(
+            'Invitation email has no recipient',
+            extra={'invitation_id': invitation.id, 'organization_id': invitation.organization_id},
+        )
+        return False
+
     # Always use FRONTEND_URL for invitation links
     base_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'http://localhost:5173'
     
@@ -108,7 +116,7 @@ Expense Management Made Simple
             subject=subject,
             message=message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[invitation.email],
+            recipient_list=[recipient_email],
             html_message=html_message,
             fail_silently=False,
         )

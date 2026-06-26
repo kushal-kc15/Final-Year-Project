@@ -1,0 +1,414 @@
+{% extends "admin/base_site.html" %}
+{% load i18n log jazzmin admin_dashboard %}
+
+{% block bodyclass %}{{ block.super }} dashboard vyapar-manager-dashboard{% endblock %}
+
+{% block content_title %}{% trans "Website Manager Console" %}{% endblock %}
+
+{% block breadcrumbs %}
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'admin:index' %}">{% trans "Home" %}</a></li>
+        <li class="breadcrumb-item">{% trans "Dashboard" %}</li>
+    </ol>
+{% endblock %}
+
+{% block content %}
+{% get_jazzmin_ui_tweaks as jazzmin_ui %}
+{% admin_dashboard_data as manager %}
+<style>
+    .vyapar-manager-dashboard .content-wrapper {
+        background: #f7f6f2;
+    }
+
+    .vyapar-manager-dashboard .content-header h1,
+    .vyapar-manager-dashboard .breadcrumb,
+    .vyapar-manager-dashboard .breadcrumb a {
+        color: #263f33;
+    }
+
+    .vyapar-manager-dashboard .manager-hero {
+        border-radius: 14px;
+        background: #1c2b24;
+        color: #fff8ef;
+        padding: 1.1rem 1.25rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .vyapar-manager-dashboard .manager-hero h2 {
+        color: #fff8ef;
+        font-size: 1.25rem;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+        margin: 0;
+    }
+
+    .vyapar-manager-dashboard .manager-hero p {
+        color: rgba(255, 248, 239, 0.78);
+        margin: 0.25rem 0 0;
+    }
+
+    .vyapar-manager-dashboard .manager-card {
+        background: #ffffff !important;
+        border: 1px solid rgba(38, 63, 51, 0.10);
+        border-radius: 12px;
+        box-shadow: none;
+        color: #1c1a17;
+        overflow: hidden;
+    }
+
+    .vyapar-manager-dashboard .manager-card .card-header,
+    .vyapar-manager-dashboard .manager-card .card-body {
+        background: #ffffff !important;
+        color: #1c1a17;
+    }
+
+    .vyapar-manager-dashboard .manager-card .card-header {
+        border-bottom: 1px solid rgba(38, 63, 51, 0.09);
+        padding: 0.85rem 1rem;
+    }
+
+    .vyapar-manager-dashboard .manager-card .card-body {
+        padding: 1rem;
+    }
+
+    .vyapar-manager-dashboard .manager-card table,
+    .vyapar-manager-dashboard .manager-card tbody,
+    .vyapar-manager-dashboard .manager-card tr,
+    .vyapar-manager-dashboard .manager-card td {
+        background: #ffffff !important;
+        color: #1c1a17;
+    }
+
+    .vyapar-manager-dashboard .manager-card td {
+        border-color: rgba(38, 63, 51, 0.08);
+    }
+
+    .vyapar-manager-dashboard .manager-card td a {
+        color: #263f33;
+        font-weight: 600;
+    }
+
+    .vyapar-manager-dashboard .summary-card {
+        min-height: 106px;
+        transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .vyapar-manager-dashboard .summary-card:hover {
+        border-color: rgba(52, 94, 72, 0.28);
+        transform: translateY(-1px);
+    }
+
+    .vyapar-manager-dashboard .summary-icon {
+        align-items: center;
+        background: #f4eee7;
+        border-radius: 10px;
+        color: #345e48;
+        display: inline-flex;
+        height: 36px;
+        justify-content: center;
+        width: 36px;
+    }
+
+    .vyapar-manager-dashboard .summary-value {
+        color: #1c1a17;
+        font-size: 1.75rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        line-height: 1;
+        margin-top: 0.7rem;
+    }
+
+    .vyapar-manager-dashboard .summary-label,
+    .vyapar-manager-dashboard .manager-muted {
+        color: #6f6a62;
+    }
+
+    .vyapar-manager-dashboard .manager-section-title {
+        color: #1c1a17;
+        font-size: 0.95rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        margin: 0;
+    }
+
+    .vyapar-manager-dashboard .manager-list-row {
+        align-items: center;
+        border-top: 1px solid rgba(38, 63, 51, 0.08);
+        display: flex;
+        gap: 0.75rem;
+        justify-content: space-between;
+        padding: 0.72rem 0;
+    }
+
+    .vyapar-manager-dashboard .manager-list-row:first-child {
+        border-top: 0;
+    }
+
+    .vyapar-manager-dashboard .manager-list-row a {
+        color: #263f33;
+        font-weight: 650;
+    }
+
+    .vyapar-manager-dashboard .manager-list-row a:hover {
+        color: #a64f38;
+    }
+
+    .vyapar-manager-dashboard .manager-list-row small {
+        color: #7f786e;
+        display: block;
+        line-height: 1.25;
+        margin-top: 0.15rem;
+    }
+
+    .vyapar-manager-dashboard .manager-pill {
+        background: #eef5ef;
+        border-radius: 999px;
+        color: #345e48;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 0.2rem 0.5rem;
+        white-space: nowrap;
+    }
+
+    .vyapar-manager-dashboard .management-heading {
+        align-items: center;
+        display: flex;
+        justify-content: space-between;
+        margin: 1.15rem 0 0.75rem;
+    }
+
+    .vyapar-manager-dashboard #recent-actions-module {
+        background: #ffffff;
+        border: 1px solid rgba(38, 63, 51, 0.10);
+        border-radius: 12px;
+        padding: 1rem;
+    }
+
+    .vyapar-manager-dashboard #recent-actions-module h4 {
+        color: #1c1a17;
+        font-size: 0.95rem;
+        font-weight: 700;
+    }
+
+    @media (max-width: 767.98px) {
+        .vyapar-manager-dashboard .manager-hero {
+            padding: 1rem;
+        }
+
+        .vyapar-manager-dashboard .summary-card {
+            min-height: auto;
+        }
+
+        .vyapar-manager-dashboard .management-heading {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+    }
+</style>
+
+<div class="col-12">
+    <section class="manager-hero">
+        <h2>Website Manager Console</h2>
+        <p>Platform overview for Vyapar Margadarshan.</p>
+    </section>
+
+    <div class="row">
+        {% for card in manager.summary_cards %}
+            <div class="col-xl-2 col-md-4 col-sm-6 col-12">
+                <a href="{{ card.url }}" class="text-decoration-none">
+                    <div class="card manager-card summary-card">
+                        <div class="card-body">
+                            <span class="summary-icon"><i class="{{ card.icon }}"></i></span>
+                            <div class="summary-value">{{ card.value }}</div>
+                            <div class="summary-label">{{ card.label }}</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="row">
+        <div class="col-xl-3 col-md-6 col-12">
+            <div class="card manager-card">
+                <div class="card-header">
+                    <h3 class="manager-section-title">Recent Organizations</h3>
+                </div>
+                <div class="card-body pt-2 pb-2">
+                    {% for item in manager.recent_organizations %}
+                        <div class="manager-list-row">
+                            <div>
+                                <a href="{{ item.url }}">{{ item.name }}</a>
+                                <small>{{ item.detail }}</small>
+                            </div>
+                            <span class="manager-pill">{{ item.created_at|date:"M j" }}</span>
+                        </div>
+                    {% empty %}
+                        <p class="manager-muted mb-0">No organizations yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 col-12">
+            <div class="card manager-card">
+                <div class="card-header">
+                    <h3 class="manager-section-title">Recent Users</h3>
+                </div>
+                <div class="card-body pt-2 pb-2">
+                    {% for item in manager.recent_users %}
+                        <div class="manager-list-row">
+                            <div>
+                                <a href="{{ item.url }}">{{ item.name }}</a>
+                                <small>{{ item.detail }}</small>
+                            </div>
+                            <span class="manager-pill">{{ item.created_at|date:"M j" }}</span>
+                        </div>
+                    {% empty %}
+                        <p class="manager-muted mb-0">No users yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 col-12">
+            <div class="card manager-card">
+                <div class="card-header">
+                    <h3 class="manager-section-title">Recent Expenses</h3>
+                </div>
+                <div class="card-body pt-2 pb-2">
+                    {% for item in manager.recent_expenses %}
+                        <div class="manager-list-row">
+                            <div>
+                                <a href="{{ item.url }}">{{ item.name }}</a>
+                                <small>{{ item.detail }}</small>
+                            </div>
+                            <span class="manager-pill">₨ {{ item.amount }}</span>
+                        </div>
+                    {% empty %}
+                        <p class="manager-muted mb-0">No expenses yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 col-12">
+            <div class="card manager-card">
+                <div class="card-header">
+                    <h3 class="manager-section-title">Recent Activity Logs</h3>
+                </div>
+                <div class="card-body pt-2 pb-2">
+                    {% for item in manager.recent_activity_logs %}
+                        <div class="manager-list-row">
+                            <div>
+                                <a href="{{ item.url }}">{{ item.name }}</a>
+                                <small>{{ item.detail|truncatechars:70 }}</small>
+                            </div>
+                            <span class="manager-pill">{{ item.created_at|date:"M j" }}</span>
+                        </div>
+                    {% empty %}
+                        <p class="manager-muted mb-0">No activity logs yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="management-heading">
+        <h3 class="manager-section-title">Management sections</h3>
+        <span class="manager-muted">Normal Django Admin model access remains available.</span>
+    </div>
+</div>
+
+{% get_side_menu using="app_list" as dashboard_list %}
+{% if dashboard_list %}
+    {% widthratio dashboard_list|length 2 1 as middle %}
+{% endif %}
+
+<div class="col-lg-9 col-12">
+    <div class="row">
+        <div class="col-md-6 col-sm-12">
+            {% for app in dashboard_list %}
+                <div class="card manager-card">
+                    <div class="card-header">
+                        <h5 class="m-0">{{ app.name }}</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                            {% for model in app.models %}
+                                <tr>
+                                    <td>
+                                        {% if model.url %}<a href="{{ model.url }}">{{ model.name }}</a>{% else %}{{ model.name }}{% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group float-right">
+                                            {% if model.add_url %}
+                                                <a href="{{ model.add_url }}" class="btn btn-xs {{ jazzmin_ui.button_classes.success }} addlink">{% trans "Add" %}</a>
+                                            {% endif %}
+                                            {% if model.url %}
+                                                {% if model.view_only %}
+                                                    <a href="{{ model.url }}" class="btn btn-xs {{ jazzmin_ui.button_classes.info }} viewlink">{% trans "View" %}</a>
+                                                {% else %}
+                                                    <a href="{{ model.url }}" class="btn btn-xs {{ jazzmin_ui.button_classes.info }} changelink">{% if model.custom %}{% trans "Go" %}{% else %}{% trans "Change" %}{% endif %}</a>
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {% if forloop.counter == middle|add:"0" %}
+                    </div>
+                    <div class="col-md-6 col-sm-12">
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="col-lg-3 col-12">
+    <div id="content-related">
+        <div class="module" id="recent-actions-module">
+            <h4 class="mb-3">{% trans "Recent admin actions" %}</h4>
+            {% get_admin_log 6 as admin_log for_user user %}
+            {% if not admin_log %}
+                <p>{% trans "None available" %}</p>
+            {% else %}
+                <div class="timeline">
+                    {% for entry in admin_log %}
+                        <div>
+                            {% if entry.is_change %}
+                                <i class="fas fa-edit bg-gray text-xs"></i>
+                            {% elif entry.is_deletion %}
+                                <i class="fas fa-trash bg-danger text-xs"></i>
+                            {% elif entry.is_addition %}
+                                <i class="fas fa-plus-circle bg-success text-xs"></i>
+                            {% endif %}
+
+                            <div class="timeline-item">
+                                <span class="time"><i class="fas fa-clock"></i> {% blocktrans with timesince=entry.action_time|timesince %}{{ timesince }} ago{% endblocktrans %}</span>
+                                <h3 class="timeline-header no-border">
+                                    {% if entry.is_deletion or not entry.get_admin_url %}
+                                        {{ entry.object_repr }}
+                                    {% else %}
+                                        <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+                                    {% endif %}
+                                </h3>
+                            </div>
+                        </div>
+                    {% endfor %}
+                    <div>
+                        <i class="fa fa-clock bg-gray"></i>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

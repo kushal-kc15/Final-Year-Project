@@ -29,14 +29,14 @@ export default function ForgotPassword() {
     try {
       await api.post('/auth/request-password-reset/', { email: normalizedEmail });
       setDone(true);
+      toast.success('Reset link sent if that email exists.');
     } catch {
-      // Neutral messaging: do not reveal whether email exists.
+      // Neutral messaging – never confirm existence.
       toast.error('Could not send the reset link. Try again in a moment.');
     } finally {
       setLoading(false);
     }
   };
-
 
   return (
     <div className="min-h-screen flex flex-col bg-paper">
@@ -44,7 +44,7 @@ export default function ForgotPassword() {
         <Link to="/">
           <Logo size={28} withWordmark wordmarkSize="lg" />
         </Link>
-        <Link to="/login" className="text-sm text-ink-soft hover:text-ink">
+        <Link to="/login" className="text-sm text-ink-soft hover:text-ink transition-colors">
           Back to sign in
         </Link>
       </header>
@@ -56,9 +56,11 @@ export default function ForgotPassword() {
           </h1>
           <p className="mt-2 text-sm text-ink-muted">
             {done ? (
-              <>If an account exists for <span className="font-medium text-ink">{normalizedEmail}</span>, we sent a reset link. The link expires in an hour.</>
+              <>
+                If an account exists for <span className="font-medium text-ink">{normalizedEmail}</span>, we sent a reset link. The link expires in one hour.
+              </>
             ) : (
-              <>Enter your email and we’ll send a reset link. No details are revealed.</>
+              'Enter your email and we’ll send a reset link if an account exists.'
             )}
           </p>
 
@@ -72,6 +74,7 @@ export default function ForgotPassword() {
                 error={err}
                 required
                 placeholder="you@company.com"
+                autoComplete="email"
               />
               <Button
                 type="submit"
@@ -83,6 +86,9 @@ export default function ForgotPassword() {
               >
                 {loading ? 'Sending reset link…' : 'Send reset link'}
               </Button>
+              <p className="text-xs text-ink-muted text-center">
+                We’ll only send the link if the email matches an account.
+              </p>
             </form>
           ) : (
             <div className="mt-8 space-y-4 text-center">
@@ -90,7 +96,7 @@ export default function ForgotPassword() {
                 Back to sign in
               </Button>
               <p className="text-xs text-ink-muted">
-                If you don’t see the email, check spam/junk and try again.
+                If you don’t see the email, check your spam folder and try again.
               </p>
             </div>
           )}

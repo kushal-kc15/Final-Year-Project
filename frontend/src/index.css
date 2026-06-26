@@ -4,6 +4,90 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: light;
+
+  --color-paper: 251 250 247;
+  --color-paper-deep: 243 241 234;
+  --color-paper-edge: 236 232 222;
+
+  --color-ink: 28 26 23;
+  --color-ink-soft: 61 58 53;
+  --color-ink-muted: 111 106 98;
+  --color-ink-faint: 163 158 149;
+
+  --color-rule: 227 221 208;
+  --color-rule-strong: 203 195 177;
+
+  --color-forest-50: 230 240 234;
+  --color-forest-100: 201 221 208;
+  --color-forest-200: 164 199 174;
+  --color-forest-500: 63 114 89;
+  --color-forest-600: 52 94 72;
+  --color-forest-700: 40 74 57;
+
+  --color-moss-50: 235 242 232;
+  --color-moss-200: 196 214 187;
+  --color-moss-500: 90 122 74;
+  --color-moss-600: 73 103 59;
+  --color-moss-700: 62 86 50;
+
+  --color-saffron-50: 251 242 224;
+  --color-saffron-200: 239 207 151;
+  --color-saffron-500: 201 140 43;
+  --color-saffron-600: 169 111 30;
+  --color-saffron-700: 141 94 21;
+
+  --color-cinnabar-50: 251 238 234;
+  --color-cinnabar-200: 241 195 183;
+  --color-cinnabar-300: 232 153 135;
+  --color-cinnabar-500: 194 65 42;
+  --color-cinnabar-600: 168 51 31;
+  --color-cinnabar-700: 138 41 26;
+}
+
+:root.dark {
+  color-scheme: dark;
+
+  --color-paper: 28 27 24;
+  --color-paper-deep: 36 34 30;
+  --color-paper-edge: 46 43 38;
+
+  --color-ink: 242 239 232;
+  --color-ink-soft: 215 209 199;
+  --color-ink-muted: 174 167 156;
+  --color-ink-faint: 128 121 111;
+
+  --color-rule: 58 54 48;
+  --color-rule-strong: 82 76 67;
+
+  --color-forest-50: 30 45 37;
+  --color-forest-100: 39 61 49;
+  --color-forest-200: 54 82 66;
+  --color-forest-500: 126 188 154;
+  --color-forest-600: 151 205 175;
+  --color-forest-700: 119 181 148;
+
+  --color-moss-50: 35 46 31;
+  --color-moss-200: 63 82 54;
+  --color-moss-500: 135 174 113;
+  --color-moss-600: 157 193 137;
+  --color-moss-700: 177 207 160;
+
+  --color-saffron-50: 49 41 25;
+  --color-saffron-200: 91 72 38;
+  --color-saffron-500: 225 166 72;
+  --color-saffron-600: 235 183 96;
+  --color-saffron-700: 244 202 126;
+
+  --color-cinnabar-50: 52 32 28;
+  --color-cinnabar-200: 96 52 43;
+  --color-cinnabar-300: 150 73 59;
+  --color-cinnabar-500: 224 104 78;
+  --color-cinnabar-600: 236 128 103;
+  --color-cinnabar-700: 244 161 141;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;
@@ -21,15 +105,15 @@
   }
 
   ::selection {
-    background: #fbeeea;
-    color: #8a291a;
+    background: rgb(var(--color-cinnabar-50));
+    color: rgb(var(--color-cinnabar-700));
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Inter', system-ui, sans-serif;
     font-weight: 500;
     letter-spacing: -0.02em;
-    color: #1c1a17;
+    color: rgb(var(--color-ink));
     text-wrap: balance;
   }
 
@@ -40,7 +124,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid #c2412a;
+    outline: 2px solid rgb(var(--color-forest-500));
     outline-offset: 2px;
   }
 
@@ -52,11 +136,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #cbc3b1;
+    background: rgb(var(--color-rule-strong));
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #a39e95;
+    background: rgb(var(--color-ink-faint));
   }
 
   @media (prefers-reduced-motion: reduce) {

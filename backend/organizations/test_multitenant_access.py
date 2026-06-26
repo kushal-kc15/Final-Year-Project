@@ -146,7 +146,7 @@ class MultiTenantAccessTestCase(TestCase):
         self.assertNotIn(self.other_invitation.id, ids)
 
         self.assert_not_found(self.client.get(f'/api/invitations/{self.other_invitation.id}/'))
-        self.assert_not_found(self.client.delete(f'/api/invitations/{self.other_invitation.id}/cancel/'))
+        self.assert_not_found(self.client.post(f'/api/invitations/{self.other_invitation.id}/cancel/'))
         self.assert_not_found(self.client.post(f'/api/invitations/{self.other_invitation.id}/resend/'))
 
     def test_notifications_are_scoped_to_authenticated_user(self):
