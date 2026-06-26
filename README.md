@@ -1,89 +1,157 @@
-# Vyapar Margadarshan - Expense Management System
+# Vyapar Margadarshan
 
-A full-stack expense management application with AI-powered receipt OCR.
+Business Expense Management Platform
+
+Vyapar Margadarshan is a full-stack expense management system for small teams and organizations. It helps owners and staff record expenses, upload receipts, review approvals, manage budgets, and generate approved-spend reports from one workspace-aware dashboard.
+
+## Problem Statement
+
+Many small businesses track spending through spreadsheets, chat messages, paper receipts, and manual approvals. This creates delays, missing receipts, unclear budget usage, and weak visibility into approved spending. Vyapar Margadarshan provides a structured workflow for recording, reviewing, and reporting business expenses while keeping each organization's data separate.
+
+## Key Features
+
+- Multi-workspace organization support
+- Owner and staff roles
+- Expense submission with category, vendor, amount, date, and receipt
+- Receipt upload with OCR-assisted data extraction
+- Approval, rejection, correction, and resubmission workflow
+- Budget tracking with threshold alerts
+- Approved-only analytics and CSV exports
+- Team invitations and invitation cancellation
+- Staff read-only team view
+- Notifications and activity logs
+- Jazzmin-powered website manager admin dashboard
+- Light/dark theme support
 
 ## Tech Stack
 
-- **Backend**: Django 4.2 + Django REST Framework
-- **Frontend**: React 18 + Vite + Tailwind CSS
-- **Database**: SQLite (development)
-- **OCR**: Google Gemini AI (FREE) + Tesseract (fallback)
+**Frontend**
+- React 18
+- Vite
+- Tailwind CSS
+- Axios
+- React Router
+- Lucide icons
+
+**Backend**
+- Django 4.2
+- Django REST Framework
+- Simple JWT
+- Django Jazzmin
+- django-filter
+- Celery and Redis support for background work
+
+**Database**
+- SQLite for local development
+- PostgreSQL supported through `DATABASE_URL`
+
+**OCR and AI integrations**
+- NVIDIA/OpenAI-compatible vision OCR configuration
+- FreeModel OCR fallback configuration
+- Optional AI finance insights endpoint
+
+## Screenshots
+
+Screenshots are documented in [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md). Add final images under a `screenshots/` folder before publishing the repository.
 
 ## Quick Start
 
-### Backend Setup
+Run the backend and frontend in separate terminals.
 
-```bash
+### Backend
+
+```powershell
 cd backend
 python -m venv venv
-.\venv\Scripts\activate  # Windows
+.\venv\Scripts\Activate.ps1
 pip install -r requirements/development.txt
+Copy-Item .env.example .env
 python manage.py migrate
+python manage.py createsuperuser
 python manage.py runserver
 ```
 
-### Frontend Setup
+### Frontend
 
-```bash
+```powershell
 cd frontend
 npm install
+Copy-Item .env.example .env.local
 npm run dev
 ```
 
-## Login Credentials
+Default local URLs:
 
-- **Admin**: admin / admin123
-- **User**: kushalkc / kushalkc123
-- **Test Users**: user1-50 / password123
+- Frontend: `http://localhost:5173`
+- Backend API: `http://127.0.0.1:8000/api/`
+- Admin dashboard: `http://127.0.0.1:8000/admin/`
 
-## Features
+## Environment Variables
 
-- ✅ User authentication (JWT)
-- ✅ Expense tracking & management
-- ✅ Budget management
-- ✅ Organization & team management
-- ✅ Receipt OCR (AI-powered)
-- ✅ Activity logging
-- ✅ Analytics & reports
+Use `.env.example` files as templates only. Never commit real secrets, Gmail app passwords, database passwords, JWT signing keys, OAuth secrets, or API tokens.
 
-## OCR Setup (Optional)
+See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for a safe variable reference.
 
-The app uses **Google Gemini AI** for smart receipt scanning (100% FREE).
+## User Roles
 
-1. Get API key: https://aistudio.google.com/app/apikey
-2. Add to `backend/.env`:
-   ```env
-   GEMINI_API_KEY=your-key-here
-   ```
-3. Restart backend server
+- **Owner**: manages workspace settings, team invitations, budgets, approvals, organization-wide reports, and vendor analytics.
+- **Staff**: submits expenses, corrects rejected expenses, views their own expense data, and can see a read-only team view.
+- **Superuser/platform admin**: uses Django Admin/Jazzmin to manage platform data and inspect system activity.
 
-**Note**: Works with Tesseract OCR by default (no setup needed).
+More detail is available in [docs/USER_ROLES.md](docs/USER_ROLES.md).
 
-## Dummy Data
+## Main Workflows
 
-The database includes:
-- 50+ users
-- 10 organizations
-- 1,000+ expenses
-- 50+ budgets
-- 500+ activity logs
+- Create or switch workspace
+- Invite team members
+- Accept invitations as a new or existing user
+- Submit expenses with receipt attachments
+- Approve or reject submitted expenses
+- Correct and resubmit rejected expenses
+- Track category budgets
+- Export approved-spend reports as CSV
 
-## API Endpoints
+See [docs/WORKFLOWS.md](docs/WORKFLOWS.md) for step-by-step flows.
 
-- `/api/auth/` - Authentication
-- `/api/users/` - User management
-- `/api/organizations/` - Organizations
-- `/api/expenses/` - Expenses
-- `/api/budgets/` - Budgets
-- `/api/receipts/` - Receipt OCR
-- `/api/activity-logs/` - Activity logs
+## Testing
 
-## Development
+Backend:
 
-- Backend: http://127.0.0.1:8000/
-- Frontend: http://localhost:5173/
-- Admin Panel: http://127.0.0.1:8000/admin/
+```powershell
+cd backend
+python manage.py test
+python manage.py check
+```
 
-## License
+Frontend:
 
-MIT
+```powershell
+cd frontend
+npm run build
+```
+
+More testing notes are in [docs/TESTING.md](docs/TESTING.md).
+
+## Documentation
+
+- [Project Overview](docs/PROJECT_OVERVIEW.md)
+- [Features](docs/FEATURES.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [User Roles](docs/USER_ROLES.md)
+- [Workflows](docs/WORKFLOWS.md)
+- [Installation](docs/INSTALLATION.md)
+- [Environment](docs/ENVIRONMENT.md)
+- [API Overview](docs/API_OVERVIEW.md)
+- [Testing](docs/TESTING.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Future Scope](docs/FUTURE_SCOPE.md)
+- [Screenshots](docs/SCREENSHOTS.md)
+
+## Project Status
+
+This project was completed as a final-year academic project. The core expense management, organization scoping, role-based workflows, reporting, team invitation, OCR, and admin-dashboard features are implemented.
+
+## Future Scope
+
+Planned improvements include production deployment hardening, PDF reports, richer audit trails, mobile access, organization billing, and more advanced analytics.
+
