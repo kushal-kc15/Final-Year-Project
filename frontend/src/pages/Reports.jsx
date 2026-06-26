@@ -1,27 +1,41 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Calendar, Download, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
+  BarChart3,
+  Calendar,
+  Download,
+  Filter,
+  RefreshCw,
+  Search,
+} from "lucide-react";
 import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { Panel, PanelHeader, PanelTitle } from "../components/Panel.jsx";
-import { PageHeader } from "../components/PageHeader.jsx";
 import { Select, Input } from "../components/Field.jsx";
 import { BarChart, DonutChart } from "../components/Charts.jsx";
 import { Money } from "../components/Money.jsx";
 import { formatCompact } from "../lib/currency.js";
+import { formatDate } from "../lib/date.js";
 import { EmptyState, ErrorState, Spinner } from "../components/Feedback.jsx";
 import Button from "../components/Button.jsx";
 import PaginationControls from "../components/PaginationControls.jsx";
 import { useToast } from "../components/Toast.jsx";
-import { formatCategoryLabel } from "../lib/categories.js";
+import {
+  EXPENSE_CATEGORIES,
+  formatCategoryLabel,
+} from "../lib/categories.js";
 
 const PRESETS = [
-  { value: "month", label: "This month" },
-  { value: "quarter", label: "Last 3 months" },
-  { value: "ytd", label: "Year to date" },
-  { value: "custom", label: "Custom range" },
+  { value: "this_month", label: "This month" },
+  { value: "last_month", label: "Last month" },
+  { value: "last_30_days", label: "Last 30 days" },
+  { value: "this_year", label: "This year" },
+  { value: "custom", label: "Custom" },
 ];
 
-const CAT_COLORS = [
+const CHART_COLORS = [
   "oklch(0.56 0.17 25)",
   "oklch(0.50 0.08 150)",
   "oklch(0.60 0.12 65)",
@@ -30,209 +44,232 @@ const CAT_COLORS = [
   "oklch(0.45 0.05 90)",
 ];
 
-const categoryLabel = (value) => formatCategoryLabel(value) ?? "-";
+const DASH = "\u2014";
 
+const padDate = (date) => date.toISOString().slice(0, 10);
 
-const roleLabel = (role) => {
-  const normalized = String(role ?? "").toUpperCase();
-  if (normalized === "OWNER") return "Owner reporting";
-  if (normalized === "STAFF") return "Staff reporting";
-  return "Workspace reporting";
+const monthBounds = (offset = 0) => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const end =
+    offset === 0
+      ? now
+      : new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+  return { from: padDate(start), to: padDate(end) };
 };
 
-const sourceLabels = {
-  trends: "spending trend",
-  categories: "category breakdown",
-  vendors: "top vendor",
+const presetBounds = (preset) => {
+  const now = new Date();
+  if (preset === "last_month") return monthBounds(-1);
+  if (preset === "last_30_days") {
+    const start = new Date(now);
+    start.setDate(now.getDate() - 29);
+    return { from: padDate(start), to: padDate(now) };
+  }
+  if (preset === "this_year") {
+    return {
+      from: padDate(new Date(now.getFullYear(), 0, 1)),
+      to: padDate(now),
+    };
+  }
+  return monthBounds(0);
 };
+
+const personName = (expense) =>
+  expense?.user_name ??
+  expense?.submitted_by_name ??
+  expense?.user_details?.full_name ??
+  expense?.user_details?.username ??
+  expense?.user_details?.email ??
+  "Team member";
+
+const errorMessage = (error) => {
+  const data = error?.response?.data;
+  if (typeof data?.detail === "string") return data.detail;
+  if (typeof data?.error === "string") return data.error;
+  if (data && typeof data === "object") {
+    const first = Object.values(data)[0];
+    if (Array.isArray(first)) return first[0];
+    if (typeof first === "string") return first;
+  }
+  return "Report data could not be loaded. Expense records were not changed.";
+};
+
+const trendPeriodForRange = (preset, from, to) => {
+  if (preset === "this_year") return "monthly";
+  if (preset === "last_30_days") return "daily";
+  if (preset !== "custom") return "daily";
+
+  const start = new Date(from);
+  const end = new Date(to);
+  const days =
+    Number.isFinite(start.getTime()) && Number.isFinite(end.getTime())
+      ? Math.max(0, Math.ceil((end.getTime() - start.getTime()) / 86400000))
+      : 0;
+  if (days <= 45) return "daily";
+  if (days <= 150) return "weekly";
+  return "monthly";
+};
+
+const rangeLabel = (from, to) =>
+  `${from ? formatDate(from, "short") : DASH} - ${to ? formatDate(to, "short") : DASH}`;
 
 export default function Reports() {
-  const { currency, role, organization } = useAuth();
+  const { currency, organization } = useAuth();
   const toast = useToast();
-  const [preset, setPreset] = useState("month");
-  const [from, setFrom] = useState(() => {
-    const date = new Date();
-    date.setDate(1);
-    return date.toISOString().slice(0, 10);
-  });
-  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const requestRef = useRef(0);
+
+  const initialRange = useMemo(() => presetBounds("this_month"), []);
+  const [preset, setPreset] = useState("this_month");
+  const [from, setFrom] = useState(initialRange.from);
+  const [to, setTo] = useState(initialRange.to);
+  const [category, setCategory] = useState("");
+  const [vendor, setVendor] = useState("");
+  const [vendorInput, setVendorInput] = useState("");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [sourceErrors, setSourceErrors] = useState([]);
+  const [loadError, setLoadError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [exporting, setExporting] = useState(false);
+  const [expensePage, setExpensePage] = useState(1);
 
-  const reportsPageSize = 10;
-  const [reportsPage, setReportsPage] = useState(1);
+  const organizationId = organization?.id ?? "";
+  const pageSize = 10;
 
   useEffect(() => {
     if (preset === "custom") return;
-
-    const now = new Date();
-    const start = new Date();
-    if (preset === "month") start.setDate(1);
-    else if (preset === "quarter") start.setMonth(now.getMonth() - 3);
-    else if (preset === "ytd") start.setMonth(0, 1);
-
-    setFrom(start.toISOString().slice(0, 10));
-    setTo(now.toISOString().slice(0, 10));
+    const range = presetBounds(preset);
+    setFrom(range.from);
+    setTo(range.to);
   }, [preset]);
 
-  const trendPeriod = useMemo(() => {
-    // Keep chart labels readable: daily for short ranges, weekly/monthly for longer ranges.
-    if (preset === "month") return "daily";
-    if (preset === "quarter") return "weekly";
-    if (preset === "ytd") return "monthly";
-    // For custom range, estimate by date span.
-    if (preset === "custom" && from && to) {
-      const start = new Date(from);
-      const end = new Date(to);
-      const days = Number.isFinite(start.getTime()) && Number.isFinite(end.getTime())
-        ? Math.max(0, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
-        : 0;
-      if (days <= 35) return "daily";
-      if (days <= 140) return "weekly";
-      return "monthly";
-    }
-    return "daily";
-  }, [preset, from, to]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setVendor(vendorInput.trim());
+    }, 350);
+    return () => window.clearTimeout(timeout);
+  }, [vendorInput]);
+
+  useEffect(() => {
+    setExpensePage(1);
+  }, [preset, from, to, category, vendor, organizationId]);
+
+  const trendPeriod = useMemo(
+    () => trendPeriodForRange(preset, from, to),
+    [preset, from, to],
+  );
+
+  const params = useMemo(
+    () => ({
+      start_date: from,
+      end_date: to,
+      period: trendPeriod,
+      ...(category ? { category } : {}),
+      ...(vendor ? { vendor } : {}),
+    }),
+    [from, to, trendPeriod, category, vendor],
+  );
 
   const loadReports = useCallback(() => {
-    if (!from || !to) return;
+    if (!organizationId || !from || !to) {
+      setData(null);
+      setLoading(false);
+      setLoadError("");
+      return;
+    }
 
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
     setLoading(true);
-    setSourceErrors([]);
+    setLoadError("");
+    setData(null);
 
-    Promise.allSettled([
-      api.get("/analytics/spending-trends/", {
-        params: { start_date: from, end_date: to, period: trendPeriod },
-      }),
-      api.get("/analytics/category-breakdown/", {
-        params: { start_date: from, end_date: to },
-      }),
-      api.get("/analytics/vendor-summary/", {
-        params: { start_date: from, end_date: to, limit: 1 },
-      }),
-    ])
-      .then(([trends, categories, vendors]) => {
-        const failed = [];
-        if (trends.status !== "fulfilled") failed.push("trends");
-        if (categories.status !== "fulfilled") failed.push("categories");
-        if (vendors.status !== "fulfilled") failed.push("vendors");
-
-        setSourceErrors(failed);
-        setData({
-          monthly:
-            trends.status === "fulfilled"
-              ? (trends.value.data?.trends ?? trends.value.data?.monthly ?? [])
-              : [],
-          by_category:
-            categories.status === "fulfilled"
-              ? (categories.value.data?.breakdown ??
-                categories.value.data?.categories ??
-                categories.value.data?.results ??
-                categories.value.data ??
-                [])
-              : [],
-          top_vendor:
-            vendors.status === "fulfilled"
-              ? (vendors.value.data?.vendors?.[0] ??
-                vendors.value.data?.results?.[0] ??
-                null)
-              : null,
-        });
+    api
+      .get("/analytics/report-detail/", { params })
+      .then((response) => {
+        if (requestRef.current !== requestId) return;
+        setData(response.data ?? null);
       })
-      .catch(() => {
-        setSourceErrors(["trends", "categories", "vendors"]);
+      .catch((error) => {
+        if (requestRef.current !== requestId) return;
         setData(null);
+        setLoadError(errorMessage(error));
       })
-      .finally(() => setLoading(false));
-  }, [from, to, trendPeriod]);
+      .finally(() => {
+        if (requestRef.current === requestId) setLoading(false);
+      });
+  }, [organizationId, from, to, params]);
 
   useEffect(() => {
     loadReports();
   }, [loadReports, refreshKey]);
 
-  useEffect(() => {
-    setReportsPage(1);
-  }, [preset, from, to]);
+  const summary = data?.summary ?? {};
+  const expenses = data?.expenses ?? [];
+  const categories = data?.categories ?? [];
+  const vendors = data?.vendors ?? [];
+  const trends = data?.trends ?? [];
+  const comparison = data?.comparison ?? null;
+  const total = Number(summary.total) || 0;
+  const count = Number(summary.count) || 0;
+  const average = Number(summary.average) || 0;
+  const topCategory = data?.top_category ?? null;
+  const topVendor = data?.top_vendor ?? null;
+  const hasFilters = Boolean(category || vendor || preset !== "this_month");
+  const hasReportData = count > 0;
+  const selectedPresetLabel =
+    PRESETS.find((item) => item.value === preset)?.label ?? "Selected range";
 
-  const monthly = data?.monthly ?? [];
+  const expensePageRows = useMemo(() => {
+    const start = (expensePage - 1) * pageSize;
+    return expenses.slice(start, start + pageSize);
+  }, [expenses, expensePage]);
 
-  // Ensure stable ordering for top category / donut / table.
-  const byCategory = useMemo(() => {
-    const rows = data?.by_category ?? [];
-    return [...rows].sort((a, b) => {
-      const ta = Number(a?.total) || 0;
-      const tb = Number(b?.total) || 0;
-      // stable fallback (category code/name)
-      if (tb !== ta) return tb - ta;
-      const aa = String(a?.category ?? a?.name ?? "");
-      const bb = String(b?.category ?? b?.name ?? "");
-      return aa.localeCompare(bb);
-    });
-  }, [data?.by_category]);
-
-  const total = byCategory.reduce(
-    (sum, category) => sum + (Number(category.total) || 0),
-    0,
+  const trendData = useMemo(
+    () =>
+      trends.map((item) => {
+        const raw = item.period_start ?? item.period ?? item.date;
+        const date = raw ? new Date(raw) : null;
+        const valid = date && !Number.isNaN(date.getTime());
+        const label = valid
+          ? trendPeriod === "monthly"
+            ? date.toLocaleDateString(undefined, { month: "short", year: "numeric" })
+            : date.toLocaleDateString(undefined, { month: "short", day: "2-digit" })
+          : item.label ?? raw ?? DASH;
+        return { label, value: Number(item.total) || 0 };
+      }),
+    [trends, trendPeriod],
   );
 
-  const topVendor = data?.top_vendor;
-  const allSourcesFailed = sourceErrors.length === 3;
-  const partialFailure = sourceErrors.length > 0 && !allSourcesFailed;
-  const hasReportData =
-    monthly.length > 0 || byCategory.length > 0 || Boolean(topVendor);
-
-  const entryCount = byCategory.reduce(
-    (sum, category) => sum + (Number(category.count) || 0),
-    0,
+  const categorySegments = useMemo(
+    () =>
+      categories.slice(0, 6).map((item, index) => ({
+        label: formatCategoryLabel(item.category),
+        value: Number(item.total) || 0,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      })),
+    [categories],
   );
 
-  const topCategory =
-    byCategory
-      .map((category) => ({
-        label: categoryLabel(category.category ?? category.name),
-        total: Number(category.total) || 0,
-      }))
-      .sort((a, b) => b.total - a.total)[0] ?? null;
+  const clearFilters = () => {
+    setPreset("this_month");
+    const range = presetBounds("this_month");
+    setFrom(range.from);
+    setTo(range.to);
+    setCategory("");
+    setVendor("");
+    setVendorInput("");
+  };
 
-  const donut = byCategory.slice(0, 6).map((category, index) => ({
-    label: categoryLabel(category.category ?? category.name),
-    value: Number(category.total) || 0,
-    color: CAT_COLORS[index % CAT_COLORS.length],
-  }));
-
-  const pagedByCategory = useMemo(() => {
-    const start = (reportsPage - 1) * reportsPageSize;
-    const end = start + reportsPageSize;
-    return byCategory.slice(start, end);
-  }, [byCategory, reportsPage]);
-
-  const failedCopy = sourceErrors
-    .map((source) => sourceLabels[source])
-    .join(", ");
-
-  const exportCsv = async () => {
-    if (
-      exporting ||
-      loading ||
-      !hasReportData ||
-      sourceErrors.length > 0 ||
-      !from ||
-      !to
-    ) {
+  const exportCsv = useCallback(async () => {
+    if (exporting || loading || !hasReportData || !organizationId || !from || !to) {
       return;
     }
 
     setExporting(true);
     try {
       const response = await api.get("/analytics/export-csv/", {
-        params: {
-          start_date: from,
-          end_date: to,
-          period: trendPeriod,
-        },
+        params,
         responseType: "blob",
       });
       const blob =
@@ -253,356 +290,547 @@ export default function Reports() {
     } finally {
       setExporting(false);
     }
-  };
+  }, [exporting, loading, hasReportData, organizationId, from, to, params, toast]);
+
+  const pageActions = useMemo(
+    () => (
+      <>
+        <Button
+          variant="secondary"
+          size="sm"
+          iconLeft={<Download size={14} />}
+          onClick={exportCsv}
+          disabled={exporting || loading || !hasReportData || !organizationId}
+        >
+          {exporting ? "Exporting..." : "Export CSV"}
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          iconLeft={<RefreshCw size={14} />}
+          onClick={() => setRefreshKey((key) => key + 1)}
+          disabled={loading || !organizationId}
+        >
+          Refresh
+        </Button>
+      </>
+    ),
+    [exportCsv, exporting, loading, hasReportData, organizationId],
+  );
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-6 sm:py-4 lg:px-10">
-      <PageHeader
-        byline={`${roleLabel(role)}${organization?.name ? ` - ${organization.name}` : ""}`}
-        title="Reports"
-        lede="Review spending trends and category breakdowns."
-        actions={
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              iconLeft={<Download size={14} />}
-              onClick={exportCsv}
-              disabled={
-                exporting ||
-                loading ||
-                !hasReportData ||
-                sourceErrors.length > 0 ||
-                !from ||
-                !to
-              }
-            >
-              {exporting ? "Exporting..." : "Export CSV"}
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              iconLeft={<RefreshCw size={14} />}
-              onClick={() => setRefreshKey((key) => key + 1)}
-              disabled={loading || !from || !to}
-            >
-              Refresh
-            </Button>
-          </>
-        }
-      />
-
-      <p className="mt-2 text-xs text-ink-muted">
-        Reports are based on <span className="font-medium text-ink">approved</span> expenses only.
-      </p>
+    <div className="mx-auto w-full max-w-7xl px-4 pb-5 pt-2 sm:px-6 lg:px-8">
+      <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5 border-b border-rule pb-2" aria-label="Report actions">
+        {pageActions}
+      </div>
 
       <section
-        className="mt-3 border-y border-rule py-3"
-        aria-label="Report range"
+        className="rounded-md border border-rule bg-paper-deep/60 px-3 py-2"
+        aria-label="Report filters"
       >
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-end">
-          <div className="md:col-span-3">
-            <Select
-              label="Range"
-              value={preset}
-              onChange={(event) => setPreset(event.target.value)}
-            >
-              {PRESETS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-          {preset === "custom" && (
-            <>
-              <div className="md:col-span-3">
-                <Input
-                  label="From"
-                  type="date"
-                  value={from}
-                  onChange={(event) => setFrom(event.target.value)}
-                />
-              </div>
-              <div className="md:col-span-3">
-                <Input
-                  label="To"
-                  type="date"
-                  value={to}
-                  onChange={(event) => setTo(event.target.value)}
-                />
-              </div>
-            </>
-          )}
-          <div
-            className={preset === "custom" ? "md:col-span-3" : "md:col-span-9"}
-          >
-            <div className="flex min-w-0 items-center gap-2 rounded-sm bg-paper-deep px-3 py-2 text-xs text-ink-muted">
-              <Calendar size={13} strokeWidth={1.5} aria-hidden="true" />
-              <span className="num min-w-0 truncate">
-                {from || "Start date"} to {to || "End date"}
-              </span>
+        <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(8rem,12rem)_minmax(0,1fr)_auto] lg:items-end">
+          <div className="flex min-w-0 items-center gap-2 lg:self-center">
+              <Filter size={14} strokeWidth={1.5} className="text-ink-muted" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-ink">Filters</p>
+              <p className="truncate text-xs text-ink-muted">
+                {rangeLabel(from, to)} - {data?.scope === "personal" ? "own data" : "workspace data"}
+              </p>
             </div>
           </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
+            <div className="lg:col-span-3">
+              <Select
+                label="Date range"
+                className="md:h-9"
+                value={preset}
+                onChange={(event) => setPreset(event.target.value)}
+                disabled={loading}
+              >
+                {PRESETS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            {preset === "custom" && (
+              <>
+                <div className="lg:col-span-2">
+                  <Input
+                    label="Start"
+                    type="date"
+                    className="md:h-9"
+                    value={from}
+                    onChange={(event) => setFrom(event.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="lg:col-span-2">
+                  <Input
+                    label="End"
+                    type="date"
+                    className="md:h-9"
+                    value={to}
+                    onChange={(event) => setTo(event.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className={preset === "custom" ? "lg:col-span-2" : "lg:col-span-3"}>
+              <Select
+                label="Category"
+                className="md:h-9"
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                disabled={loading}
+              >
+                <option value="">All categories</option>
+                {EXPENSE_CATEGORIES.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className={preset === "custom" ? "lg:col-span-3" : "lg:col-span-4"}>
+              <label className="field-label" htmlFor="report-vendor-search">
+                Vendor
+              </label>
+              <div className="relative">
+                <Search
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                />
+                <input
+                  id="report-vendor-search"
+                  type="search"
+                  value={vendorInput}
+                  onChange={(event) => setVendorInput(event.target.value)}
+                  placeholder="Search vendor"
+                  disabled={loading}
+                  className="h-10 w-full rounded-md border border-rule bg-paper pl-9 pr-3 text-sm text-ink placeholder:text-ink-muted transition-colors focus:border-moss-500 focus:outline-none focus:ring-2 focus:ring-moss-500/15 disabled:cursor-not-allowed disabled:opacity-60 md:h-9"
+                />
+              </div>
+            </div>
+
+            <div className={preset === "custom" ? "lg:col-span-1" : "lg:col-span-2"}>
+              <div className="hidden h-9 min-w-0 items-center gap-2 rounded-md bg-paper px-3 text-xs text-ink-muted ring-1 ring-rule lg:flex">
+                <Calendar size={13} strokeWidth={1.5} aria-hidden="true" />
+                <span className="truncate">{selectedPresetLabel}</span>
+              </div>
+            </div>
+          </div>
+
+          {hasFilters && (
+            <div className="flex justify-start lg:justify-end">
+              <Button variant="ghost" size="xs" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            </div>
+          )}
         </div>
       </section>
 
-      {loading ? (
-        <div className="py-12 flex flex-col items-center justify-center gap-3 text-sm text-ink-muted">
+      {!organizationId ? (
+        <EmptyState
+          title="Select a workspace"
+          description="Reports load after an active organization is selected."
+          className="py-12"
+        />
+      ) : loading ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-12 text-sm text-ink-muted">
           <Spinner className="text-ink-muted" />
-          <span>Loading report data...</span>
+          <span>Loading approved expense report...</span>
         </div>
-      ) : allSourcesFailed ? (
+      ) : loadError ? (
         <ErrorState
           title="Reports are unavailable"
-          description="Report data could not be loaded. Expense records were not changed."
+          description={loadError}
           action={
-            <Button
-              variant="secondary"
-              onClick={() => setRefreshKey((key) => key + 1)}
-            >
+            <Button variant="secondary" onClick={() => setRefreshKey((key) => key + 1)}>
               Try again
             </Button>
           }
         />
       ) : !hasReportData ? (
         <EmptyState
-          title="No report data in this range"
-          description="Try a wider date range or add approved expenses."
+          title="No approved expenses found for this period."
+          description={
+            hasFilters
+              ? "Change the date, category, or vendor filters to widen the report."
+              : "Approve expenses in this workspace to start building report insights."
+          }
+          action={
+            hasFilters ? (
+              <Button variant="secondary" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            ) : null
+          }
+          className="py-12"
         />
       ) : (
         <>
-          {partialFailure && (
-            <div className="mt-3 flex items-start gap-2 rounded-sm border border-saffron-200 bg-saffron-50 px-3 py-2 text-sm text-saffron-700">
-              <AlertTriangle
-                size={16}
-                className="mt-0.5 shrink-0"
-                strokeWidth={1.5}
-                aria-hidden="true"
-              />
-              <p>Partial report loaded. Missing: {failedCopy}.</p>
-            </div>
-          )}
+          <section className="mt-2 grid grid-cols-12 gap-2 lg:gap-3" aria-label="Analytics dashboard">
+            <Panel className="col-span-12 overflow-hidden lg:col-span-8">
+              <div className="flex flex-col gap-2 border-b border-rule px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-forest-50 text-forest-700 ring-1 ring-forest-100">
+                      <BarChart3 size={16} aria-hidden="true" />
+                    </span>
+                    <div>
+                      <PanelTitle className="!text-base">Spend over time</PanelTitle>
+                      <p className="mt-0.5 text-xs text-ink-muted">
+                        Approved spend grouped by {trendPeriod}.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-left sm:text-right">
+                  <p className="text-xs text-ink-muted">Report total</p>
+                  <p className="num text-base font-semibold text-ink">
+                    <Money value={total} currency={currency} />
+                  </p>
+                </div>
+              </div>
+              {trendData.length > 0 ? (
+                <div className="px-3 pb-3 pt-3 sm:px-4">
+                  <BarChart
+                    data={trendData}
+                    height={230}
+                    currency={currency}
+                    highlightIndex={trendData.length - 1}
+                    className="rounded-md bg-paper-deep/40 p-2.5 ring-1 ring-rule"
+                  />
+                </div>
+              ) : (
+                <EmptyState
+                  title="No trend data"
+                  description="No grouped spending exists for this range."
+                  className="py-10"
+                />
+              )}
+            </Panel>
 
-          <section
-            className="mt-4 border-t border-rule pt-3"
-            aria-label="Reports summary"
-          >
-            <p className="text-sm font-medium text-ink">Summary</p>
-            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <SummaryMetric
-                label="Total expenses"
-                value={entryCount > 0 ? entryCount : "—"}
-                helper={entryCount > 0 ? "approved entries" : null}
-              />
-              <SummaryMetric
-                label="Approved amount"
-                value={<Money value={total} currency={currency} />}
-              />
-              <SummaryMetric
-                label="Top category"
-                value={topCategory?.label ?? "Unavailable"}
-                helper={
-                  topCategory ? (
-                    <Money value={topCategory.total} currency={currency} />
-                  ) : null
-                }
-              />
-              <SummaryMetric
-                label="Top vendor"
-                value={
-                  topVendor
-                    ? (topVendor.name ?? topVendor.vendor ?? "Vendor")
-                    : "Unavailable"
-                }
-              />
+            <div className="col-span-12 grid grid-cols-1 gap-3 lg:col-span-4">
+              <Panel className="overflow-hidden">
+                <PanelHeader className="!px-4 !py-2.5">
+                  <PanelTitle className="!text-base">Period summary</PanelTitle>
+                </PanelHeader>
+                <div className="space-y-2 px-4 py-2.5">
+                  <div className="grid grid-cols-2 gap-2">
+                    <CompactFact
+                      label="Approved"
+                      value={count || DASH}
+                    />
+                    <CompactFact
+                      label="Average"
+                      value={count > 0 ? <Money value={average} currency={currency} /> : DASH}
+                    />
+                  </div>
+                  <ComparisonRow
+                    label="Current"
+                    start={comparison?.current_period?.start}
+                    end={comparison?.current_period?.end}
+                    total={comparison?.current_period?.total}
+                    count={comparison?.current_period?.count}
+                    currency={currency}
+                  />
+                  <ComparisonRow
+                    label="Previous"
+                    start={comparison?.previous_period?.start}
+                    end={comparison?.previous_period?.end}
+                    total={comparison?.previous_period?.total}
+                    count={comparison?.previous_period?.count}
+                    currency={currency}
+                  />
+                  <ChangeLine value={comparison?.change_percentage} />
+                </div>
+              </Panel>
+
+              <Panel className="overflow-hidden">
+                <PanelHeader className="!px-4 !py-2.5">
+                  <PanelTitle className="!text-base">Spend leaders</PanelTitle>
+                </PanelHeader>
+                <div className="space-y-1 px-4 py-2.5">
+                  <InsightLine
+                    label="Category"
+                    name={topCategory ? formatCategoryLabel(topCategory.category) : DASH}
+                    value={topCategory?.total}
+                    currency={currency}
+                  />
+                  <InsightLine
+                    label="Vendor"
+                    name={topVendor?.vendor || DASH}
+                    value={topVendor?.total}
+                    currency={currency}
+                  />
+                </div>
+              </Panel>
             </div>
           </section>
 
-          <Panel className="mt-4">
-            <PanelHeader>
+          <section className="mt-3 grid grid-cols-12 gap-3 lg:gap-4" aria-label="Supporting analytics">
+            <Panel className="col-span-12 lg:col-span-5">
+              <PanelHeader className="!px-4 !py-3">
+                <PanelTitle className="!text-base">Category mix</PanelTitle>
+              </PanelHeader>
+              {categorySegments.length > 0 ? (
+                <div className="px-4 py-4">
+                  <DonutChart
+                    segments={categorySegments}
+                    size={160}
+                    thickness={18}
+                    centerLabel="Total"
+                    centerValue={formatCompact(total, currency)}
+                    className="items-start"
+                  />
+                </div>
+              ) : (
+                <EmptyState
+                  title="No category mix"
+                  description="No category share was returned."
+                  className="py-8"
+                />
+              )}
+            </Panel>
+
+            <Panel className="col-span-12 lg:col-span-7">
+              <PanelHeader className="!px-4 !py-3">
+                <PanelTitle className="!text-base">Category breakdown</PanelTitle>
+              </PanelHeader>
+              <BreakdownList
+                rows={categories}
+                currency={currency}
+                labelFor={(row) => formatCategoryLabel(row.category)}
+                emptyTitle="No category data"
+              />
+            </Panel>
+
+            <Panel className="col-span-12">
+              <PanelHeader className="!px-4 !py-3">
+                <PanelTitle className="!text-base">Vendor breakdown</PanelTitle>
+              </PanelHeader>
+              <BreakdownList
+                rows={vendors}
+                currency={currency}
+                labelFor={(row) => row.vendor || "Unnamed vendor"}
+                emptyTitle="No vendor data"
+                columns={2}
+              />
+            </Panel>
+          </section>
+
+          <Panel className="mt-3 overflow-hidden">
+            <PanelHeader
+              className="!px-4 !py-3 sm:!px-5"
+              action={
+                <div className="flex items-center gap-2 rounded-sm bg-paper-deep px-2 py-1 text-xs text-ink-muted">
+                  <AlertTriangle size={14} strokeWidth={1.5} aria-hidden="true" />
+                  <span>Pending and rejected expenses are excluded.</span>
+                </div>
+              }
+            >
               <div>
-                <PanelTitle>Trend</PanelTitle>
-                <p className="mt-1 text-xs text-ink-muted">Approved spend over time</p>
+                <PanelTitle className="!text-base">Approved expenses included</PanelTitle>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  {data?.scope === "personal"
+                    ? "Only your approved expenses in the active workspace."
+                    : "Approved expenses in the active workspace."}
+                </p>
               </div>
             </PanelHeader>
-            {monthly.length > 0 ? (
-              <div className="px-3 pb-2">
-                <BarChart
-                  data={monthly.map((item) => {
-                    // Backend returns { period, period_start, total, count }.
-                    const raw = item.period_start ?? item.period ?? item.date;
-                    const dateObj = raw ? new Date(raw) : null;
 
-                    const isValidDate =
-                      dateObj && !Number.isNaN(dateObj.getTime());
-                    const label = (() => {
-                      if (!isValidDate) return item.label ?? item.period ?? item.date;
-                      // period: daily / weekly / monthly
-                      if (trendPeriod === "daily") {
-                        return dateObj.toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "2-digit",
-                        });
-                      }
-                      if (trendPeriod === "weekly") {
-                        // show week start, no year to reduce clutter
-                        return dateObj.toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "2-digit",
-                        });
-                      }
-                      // monthly
-                      return dateObj.toLocaleDateString(undefined, {
-                        month: "short",
-                        year: "numeric",
-                      });
-                    })();
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[54rem] text-sm">
+                <thead>
+                  <tr className="border-b border-rule bg-paper-deep/45 text-left text-micro uppercase tracking-eyebrow text-ink-muted">
+                    <th className="py-2.5 pl-5 font-medium">Date</th>
+                    <th className="py-2.5 font-medium">Expense</th>
+                    <th className="py-2.5 font-medium">Category</th>
+                    <th className="py-2.5 font-medium">Vendor</th>
+                    <th className="py-2.5 font-medium">Submitted by</th>
+                    <th className="py-2.5 pr-5 text-right font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-rule/60">
+                  {expensePageRows.map((expense) => (
+                    <tr key={expense.id ?? expense.expense_id} className="hover:bg-paper-deep/45">
+                      <td className="whitespace-nowrap py-3 pl-5 text-xs text-ink-soft">
+                        {formatDate(expense.date, "short")}
+                      </td>
+                      <td className="max-w-sm py-3">
+                        <p className="truncate font-medium text-ink">{expense.title || DASH}</p>
+                        {expense.description && (
+                          <p className="mt-0.5 truncate text-xs text-ink-muted">
+                            {expense.description}
+                          </p>
+                        )}
+                      </td>
+                      <td className="py-3 text-ink-soft">
+                        {formatCategoryLabel(expense.category)}
+                      </td>
+                      <td className="max-w-[11rem] py-3 text-ink-soft">
+                        <span className="block truncate">{expense.vendor || DASH}</span>
+                      </td>
+                      <td className="max-w-[11rem] py-3 text-ink-soft">
+                        <span className="block truncate">{personName(expense)}</span>
+                      </td>
+                      <td className="py-3 pr-5 text-right text-ink">
+                        <Money value={expense.amount} currency={currency} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-                    return { label, value: item.total };
-                  })}
-                  height={200}
-                  currency={currency}
-                />
-              </div>
-            ) : (
-              <EmptyState
-                title="No trend data"
-                description="No values were returned for this range."
-                className="py-8"
-              />
-            )}
+            <div className="divide-y divide-rule md:hidden">
+              {expensePageRows.map((expense) => (
+                <div key={expense.id ?? expense.expense_id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink">
+                        {expense.title || DASH}
+                      </p>
+                      <p className="mt-1 text-xs text-ink-muted">
+                        {formatDate(expense.date, "short")} - {formatCategoryLabel(expense.category)}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-ink-muted">
+                        {expense.vendor || DASH} - {personName(expense)}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-sm text-ink">
+                      <Money value={expense.amount} currency={currency} />
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <PaginationControls
+              page={expensePage}
+              setPage={setExpensePage}
+              pageSize={pageSize}
+              totalItems={expenses.length}
+            />
           </Panel>
-
-          <div className="mt-4 grid grid-cols-12 gap-4 lg:gap-5">
-            <div className="col-span-12 lg:col-span-7">
-              <Panel>
-                <PanelHeader>
-                  <div>
-                    <PanelTitle>Categories</PanelTitle>
-                  </div>
-                </PanelHeader>
-                {byCategory.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[34rem] text-sm">
-                      <thead>
-                        <tr className="text-left text-micro uppercase tracking-eyebrow text-ink-muted border-b border-rule">
-                          <th className="py-2.5 pl-5 font-medium">Category</th>
-                          <th className="py-2.5 font-medium hidden sm:table-cell">
-                            Entries
-                          </th>
-                          <th className="py-2.5 font-medium text-right pr-3">
-                            Spend
-                          </th>
-                          <th className="py-2.5 font-medium text-right pr-5">
-                            Share
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-rule">
-                        {pagedByCategory.map((category, index) => {
-                          const categoryTotal = Number(category.total) || 0;
-                          const share =
-                            total > 0
-                              ? Math.round((categoryTotal / total) * 100)
-                              : 0;
-                          return (
-                            <tr
-                              key={
-                                category.category ??
-                                category.name ??
-                                category.id ??
-                                index
-                              }
-                            >
-                              <td className="py-3 pl-5 text-ink">
-                                <span className="block max-w-xs truncate font-medium">
-                                  {categoryLabel(
-                                    category.category ?? category.name,
-                                  )}
-                                </span>
-                              </td>
-                              <td className="py-3 hidden sm:table-cell num text-ink-muted">
-                                {category.count ?? "-"}
-                              </td>
-                              <td className="py-3 pr-3 num text-right text-ink">
-                                <Money value={categoryTotal} currency={currency} />
-                              </td>
-                              <td className="py-3 pr-5 num text-right text-ink-muted">
-                                {share}%
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <EmptyState
-                    title="No category data"
-                    description="No categorized spend was returned."
-                    className="py-8"
-                  />
-                )}
-
-                {byCategory.length > 0 && (
-                  <PaginationControls
-                    page={reportsPage}
-                    setPage={setReportsPage}
-                    pageSize={reportsPageSize}
-                    totalItems={byCategory.length}
-                  />
-                )}
-              </Panel>
-            </div>
-
-            <div className="col-span-12 lg:col-span-5">
-              <Panel>
-                <PanelHeader>
-                  <div>
-                    <PanelTitle>Share of spend</PanelTitle>
-                  </div>
-                </PanelHeader>
-                {donut.length > 0 ? (
-                  <div className="px-4 py-4">
-                    <DonutChart
-                      segments={donut}
-                      size={170}
-                      thickness={18}
-                      centerLabel="Total"
-                      centerValue={formatCompact(total, currency)}
-                      className="items-start"
-                    />
-                  </div>
-                ) : (
-                  <EmptyState
-                    title="No share data"
-                    description="No category share was returned."
-                    className="py-8"
-                  />
-                )}
-              </Panel>
-            </div>
-          </div>
         </>
       )}
     </div>
   );
 }
 
-function SummaryMetric({ label, value, helper }) {
+function ComparisonRow({ label, start, end, total, count, currency }) {
   return (
-    <div className="rounded-lg border border-rule bg-paper px-4 py-3">
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-sm bg-paper-deep/55 px-3 py-1.5">
+      <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-medium text-ink-muted">{label}</p>
-        <div className="h-6 w-6 rounded-full bg-paper-deep" aria-hidden />
+        <p className="num text-sm font-semibold text-ink">
+          <Money value={Number(total) || 0} currency={currency} />
+        </p>
       </div>
-      <p className="mt-2 break-words text-xl font-semibold text-ink">{value}</p>
-      {helper ? (
-        <p className="mt-1 text-xs text-ink-muted leading-snug">{helper}</p>
-      ) : (
-        <div className="mt-1 h-3" aria-hidden />
-      )}
+      <p className="mt-0.5 text-xs text-ink-muted">
+        {start ? formatDate(start, "short") : DASH} to {end ? formatDate(end, "short") : DASH}
+        {" "}- {Number(count) || 0} approved
+      </p>
+    </div>
+  );
+}
+
+function CompactFact({ label, value }) {
+  return (
+    <div className="rounded-sm bg-paper-deep/55 px-3 py-1.5">
+      <p className="text-xs text-ink-muted">{label}</p>
+      <p className="mt-0.5 truncate text-sm font-semibold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function ChangeLine({ value }) {
+  const numeric = Number(value);
+  const available = Number.isFinite(numeric);
+  const positive = numeric > 0;
+  const Icon = positive ? ArrowUpRight : ArrowDownRight;
+
+  return (
+    <div className="flex items-center justify-between border-t border-rule pt-3">
+      <div>
+        <p className="text-xs text-ink-muted">Change vs previous</p>
+        <p className="mt-0.5 text-xs text-ink-muted">Same report scope</p>
+      </div>
+      <span className="inline-flex items-center gap-1 rounded-sm bg-paper px-2 py-1 text-sm font-semibold text-ink ring-1 ring-rule">
+        {available && numeric !== 0 && <Icon size={14} aria-hidden="true" />}
+        {available ? `${numeric.toFixed(1)}%` : DASH}
+      </span>
+    </div>
+  );
+}
+
+function InsightLine({ label, name, value, currency }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-rule/70 py-2 last:border-b-0">
+      <div className="min-w-0">
+        <p className="text-xs text-ink-muted">{label}</p>
+        <p className="truncate text-sm font-medium text-ink">{name || DASH}</p>
+      </div>
+      <p className="shrink-0 text-sm text-ink">
+        {value == null ? DASH : <Money value={value} currency={currency} />}
+      </p>
+    </div>
+  );
+}
+
+function BreakdownList({ rows, currency, labelFor, emptyTitle, columns = 1 }) {
+  if (!rows?.length) {
+    return (
+      <EmptyState
+        title={emptyTitle}
+        description="No approved spend was returned for this section."
+        className="py-8"
+      />
+    );
+  }
+
+  const maxTotal = Math.max(1, ...rows.map((row) => Number(row.total) || 0));
+
+  return (
+    <div className={`grid grid-cols-1 ${columns > 1 ? "lg:grid-cols-2" : ""}`}>
+      {rows.map((row, index) => {
+        const total = Number(row.total) || 0;
+        const width = Math.max(3, Math.round((total / maxTotal) * 100));
+        return (
+          <div key={`${labelFor(row)}-${index}`} className="border-b border-rule/70 px-4 py-3 last:border-b-0">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-ink">{labelFor(row)}</p>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  {Number(row.count) || 0} approved - {Number(row.percentage) || 0}% share
+                </p>
+              </div>
+              <p className="shrink-0 text-sm font-medium text-ink">
+                <Money value={row.total} currency={currency} />
+              </p>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-pill bg-paper-deep">
+              <div
+                className="h-full rounded-pill bg-forest-600"
+                style={{ width: `${width}%` }}
+                aria-hidden="true"
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

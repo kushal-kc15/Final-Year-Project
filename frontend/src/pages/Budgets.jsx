@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -14,7 +14,6 @@ import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useToast } from "../components/Toast.jsx";
 import { Panel, PanelHeader, PanelTitle } from "../components/Panel.jsx";
-import { PageHeader } from "../components/PageHeader.jsx";
 import Button from "../components/Button.jsx";
 import { Input, Select } from "../components/Field.jsx";
 import { Modal } from "../components/Modal.jsx";
@@ -35,13 +34,6 @@ const categoryLabel = (value) => formatCategoryLabel(value) ?? "-";
 
 const periodLabel = (value) =>
   PERIODS.find((period) => period.value === value)?.label ?? value ?? "Monthly";
-
-const roleLabel = (role) => {
-  const normalized = String(role ?? "").toUpperCase();
-  if (normalized === "OWNER") return "Owner budget tracking";
-  if (normalized === "STAFF") return "Staff view";
-  return "Workspace budget tracking";
-};
 
 const budgetName = (budget) => budget?.name || categoryLabel(budget?.category);
 
@@ -70,7 +62,7 @@ const VIEW_OPTIONS = [
 ];
 
 export default function Budgets() {
-  const { currency, role, organization } = useAuth();
+  const { currency, role } = useAuth();
   const toast = useToast();
   const [rows, setRows] = useState([]);
   const [categories] = useState(BUDGET_CATEGORIES);
@@ -90,7 +82,7 @@ export default function Budgets() {
   const isExplicitStaff = String(role ?? "").toUpperCase() === "STAFF";
   const canManage = !isExplicitStaff;
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     setLoading(true);
     setLoadError("");
     api
@@ -106,11 +98,11 @@ export default function Budgets() {
         );
       })
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     refresh();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refresh]);
 
   useEffect(() => {
     setBudgetPage(1);
@@ -167,10 +159,10 @@ export default function Budgets() {
     return filteredRows.slice(start, end);
   }, [filteredRows, budgetPage]);
 
-  const openNew = () => {
+  const openNew = useCallback(() => {
     setEditing(null);
     setModalOpen(true);
-  };
+  }, []);
 
   const togglePause = async (budget) => {
     try {
@@ -227,39 +219,41 @@ export default function Budgets() {
 
   const isFiltered = query || statusFilter !== "ACTIVE";
 
+  const pageActions = useMemo(
+    () => (
+      <>
+        <Button
+          variant="secondary"
+          size="sm"
+          iconLeft={<RefreshCw size={14} />}
+          onClick={refresh}
+          disabled={loading}
+        >
+          Refresh
+        </Button>
+        {canManage && (
+          <Button
+            variant="primary"
+            size="sm"
+            iconRight={<Plus size={14} />}
+            onClick={openNew}
+          >
+            New budget
+          </Button>
+        )}
+      </>
+    ),
+    [refresh, loading, canManage, openNew],
+  );
+
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-6 sm:py-4 lg:px-10">
-      <PageHeader
-        byline={`${roleLabel(role)}${organization?.name ? ` - ${organization.name}` : ""}`}
-        title="Budgets"
-        lede="Track spending against budgets."
-        actions={
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              iconLeft={<RefreshCw size={14} />}
-              onClick={refresh}
-              disabled={loading}
-            >
-              Refresh
-            </Button>
-            {canManage && (
-              <Button
-                variant="primary"
-                size="sm"
-                iconRight={<Plus size={14} />}
-                onClick={openNew}
-              >
-                New budget
-              </Button>
-            )}
-          </>
-        }
-      />
+    <div className="mx-auto w-full max-w-6xl px-4 pt-2 pb-4 sm:px-6 sm:pt-2 sm:pb-5 lg:px-10">
+      <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5 border-b border-rule pb-2" aria-label="Budget actions">
+        {pageActions}
+      </div>
 
       {isExplicitStaff && (
-        <div className="mt-3 flex items-start gap-3 rounded-sm border border-rule bg-paper-deep px-3 py-2.5 text-sm text-ink-soft">
+        <div className="mt-2 flex items-start gap-3 rounded-sm border border-rule bg-paper-deep px-3 py-2.5 text-sm text-ink-soft">
           <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink/5 text-ink-muted">
             <ShieldCheck size={14} strokeWidth={1.5} aria-hidden="true" />
           </span>
@@ -273,10 +267,10 @@ export default function Budgets() {
       )}
 
       <section
-        className="mt-4 border-t border-rule pt-3"
+        className="mt-2 border-t border-rule pt-2"
         aria-label="Budget summary"
       >
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-medium text-ink">Budget summary</p>
             <div className="w-full sm:w-56">
@@ -318,10 +312,10 @@ export default function Budgets() {
             />
           </div>
           {totalPct > 100 && (
-            <div className="flex items-start gap-2 rounded-sm border border-rule bg-paper-deep px-3 py-2 text-sm text-ink-soft">
+            <div className="flex items-center gap-2 rounded-sm border border-saffron-200 bg-saffron-50 px-2.5 py-1.5 text-xs text-saffron-700">
               <AlertTriangle
-                size={16}
-                className="mt-0.5 shrink-0 text-cinnabar-600"
+                size={14}
+                className="shrink-0"
                 strokeWidth={1.5}
                 aria-hidden="true"
               />
@@ -332,10 +326,10 @@ export default function Budgets() {
       </section>
 
       <section
-        className="mt-3 border-y border-rule py-2.5"
+        className="mt-2 border-y border-rule py-2"
         aria-label="Budget filters"
       >
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-end">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-12 md:items-end">
           <div className="md:col-span-6">
             <label className="field-label" htmlFor="budget-search">
               Search budgets
@@ -353,7 +347,7 @@ export default function Budgets() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search by name, category, or period"
-                className="w-full h-10 pl-9 pr-3 bg-paper-deep border border-rule rounded-sm text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:bg-paper focus:border-cinnabar-500 focus:ring-2 focus:ring-cinnabar-500/15 transition-colors"
+                className="w-full h-10 md:h-9 pl-9 pr-3 bg-paper-deep border border-rule rounded-sm text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:bg-paper focus:border-moss-500 focus:ring-2 focus:ring-moss-500/15 transition-colors"
               />
             </div>
           </div>
@@ -401,9 +395,9 @@ export default function Budgets() {
         </div>
       </section>
 
-      <Panel className="mt-3">
-        <PanelHeader>
-          <PanelTitle>Budget limits</PanelTitle>
+      <Panel className="mt-2">
+        <PanelHeader className="!px-4 !py-2.5">
+          <PanelTitle className="!text-base">Budget limits</PanelTitle>
         </PanelHeader>
 
         {loading ? (
@@ -580,7 +574,7 @@ function BudgetRow({
             <span
               className={cn(
                 "num",
-                isExceeded ? "text-cinnabar-700" : "text-ink-muted",
+                isExceeded ? "text-saffron-700" : "text-ink-muted",
               )}
             >
               {isExceeded ? "Overspent by " : "Remaining "}
@@ -632,12 +626,12 @@ function BudgetRow({
 
 function SummaryMetric({ label, value, helper, danger = false }) {
   return (
-    <div className="rounded-sm border border-rule bg-paper-deep/30 px-3 py-2.5">
+    <div className="rounded-sm border border-rule bg-paper-deep/30 px-3 py-2">
       <p className="text-xs text-ink-muted">{label}</p>
       <p
         className={cn(
           "num mt-0.5 text-lg font-medium",
-          danger ? "text-cinnabar-700" : "text-ink",
+          danger ? "text-saffron-700" : "text-ink",
         )}
       >
         {value}
@@ -653,7 +647,7 @@ function RiskLabel({ tone, label }) {
       className={cn(
         "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[11px] font-medium",
         tone === "over"
-          ? "border-cinnabar-200 bg-cinnabar-50 text-cinnabar-700"
+          ? "border-saffron-200 bg-saffron-50 text-saffron-700"
           : tone === "warn"
             ? "border-saffron-200 bg-saffron-50 text-saffron-700"
             : "border-moss-500/20 bg-moss-50 text-moss-700",
@@ -672,7 +666,7 @@ function RiskLabel({ tone, label }) {
 function BudgetBar({ pct, tone, compact = false }) {
   const color =
     tone === "over"
-      ? "bg-cinnabar-500"
+      ? "bg-saffron-500"
       : tone === "warn"
         ? "bg-saffron-500"
         : tone === "paused"

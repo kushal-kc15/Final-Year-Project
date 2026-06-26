@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
@@ -14,8 +14,7 @@ import {
 import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useToast } from "../components/Toast.jsx";
-import { Panel, PanelHeader, PanelTitle } from "../components/Panel.jsx";
-import { PageHeader } from "../components/PageHeader.jsx";
+import { Panel } from "../components/Panel.jsx";
 import Button from "../components/Button.jsx";
 import { Input, Select, Textarea } from "../components/Field.jsx";
 import { Modal } from "../components/Modal.jsx";
@@ -38,20 +37,12 @@ const STATUSES = [
 const categoryLabel = (value) => formatCategoryLabel(value) ?? "-";
 
 const personName = (expense) =>
-
   expense?.submitted_by_name ??
   expense?.user_name ??
   expense?.user_details?.full_name ??
   expense?.user_details?.username ??
   expense?.user_details?.email ??
   "Team member";
-
-const roleLabel = (role) => {
-  const normalized = String(role ?? "").toUpperCase();
-  if (normalized === "OWNER") return "Owner view";
-  if (normalized === "STAFF") return "Staff view";
-  return "Workspace view";
-};
 
 const expensePayload = (form) => ({
   title: form.title,
@@ -63,7 +54,7 @@ const expensePayload = (form) => ({
 });
 
 export default function Expenses() {
-  const { currency, role, organization, user } = useAuth();
+  const { currency, role, user } = useAuth();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
 
@@ -117,22 +108,22 @@ export default function Expenses() {
         );
       })
       .finally(() => setLoading(false));
-  }, [q, status, category, page, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [q, status, category, page, refreshKey]);
 
   const totalAmount = useMemo(
     () => rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0),
     [rows],
   );
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setModalOpen(false);
     setEditing(null);
-  };
-  const openNew = () => {
+  }, []);
+  const openNew = useCallback(() => {
     setEditing(null);
     setModalOpen(true);
-  };
-  const retryLoad = () => setRefreshKey((key) => key + 1);
+  }, []);
+  const retryLoad = useCallback(() => setRefreshKey((key) => key + 1), []);
   const clearFilters = () => {
     setQ("");
     setStatus("");
@@ -148,7 +139,7 @@ export default function Expenses() {
       : `expenses_${new Date().toISOString().slice(0, 10)}.csv`;
   };
 
-  const exportCsv = async () => {
+  const exportCsv = useCallback(async () => {
     const next = new URLSearchParams();
     if (q) next.set("search", q);
     if (status) next.set("status", status);
@@ -175,60 +166,78 @@ export default function Expenses() {
     } catch {
       toast.error("Could not export expenses.");
     }
-  };
+  }, [q, status, category, toast]);
 
   const onSaved = () => {
     closeModal();
-    toast.success(editing ? "Expense updated." : "Expense added.");
+    const wasRejected = String(editing?.status ?? "").toUpperCase() === "REJECTED";
+    toast.success(
+      editing
+        ? wasRejected
+          ? "Expense resubmitted for approval."
+          : "Expense updated."
+        : "Expense added.",
+    );
     setRefreshKey((key) => key + 1);
   };
 
+  const pageActions = useMemo(
+    () => (
+      <>
+        <Button
+          variant="secondary"
+          size="sm"
+          iconLeft={<Download size={14} />}
+          onClick={exportCsv}
+          disabled={loading || count === 0}
+        >
+          Export CSV
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          iconRight={<ScanText size={14} />}
+          onClick={() => setOcrOpen(true)}
+        >
+          Scan receipt
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          iconLeft={<RefreshCw size={14} />}
+          onClick={retryLoad}
+          disabled={loading}
+        >
+          Refresh
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          iconRight={<Plus size={14} />}
+          onClick={openNew}
+        >
+          Add expense
+        </Button>
+      </>
+    ),
+    [exportCsv, loading, count, retryLoad, openNew],
+  );
+
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-6 sm:py-4 lg:px-10">
-      <PageHeader
-        byline={`${roleLabel(role)}${organization?.name ? ` - ${organization.name}` : ""}`}
-        title="Expenses"
-        lede="Track expenses, receipts, and approvals."
-        actions={
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              iconLeft={<Download size={14} />}
-              onClick={exportCsv}
-              disabled={loading || count === 0}
-            >
-              Export CSV
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              iconRight={<ScanText size={14} />}
-              onClick={() => setOcrOpen(true)}
-            >
-              Scan receipt
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              iconRight={<Plus size={14} />}
-              onClick={openNew}
-            >
-              Add expense
-            </Button>
-          </>
-        }
-      />
+    <div className="mx-auto w-full max-w-6xl px-4 pt-2 pb-4 sm:px-6 sm:pt-2 sm:pb-5 lg:px-10">
+      <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5 border-b border-rule pb-2" aria-label="Expense actions">
+        {pageActions}
+      </div>
 
       <section
-        className="mt-3 border-y border-rule"
+        className="border-y border-rule bg-paper-deep/30"
         aria-label="Expense filters"
       >
-        <div className="flex flex-col gap-3 py-2.5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-medium text-ink">Filter ledger</p>
-              <p className="text-xs text-ink-muted">
+        <div className="flex flex-col gap-2 px-3 py-2 sm:px-4">
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-baseline gap-2">
+              <p className="shrink-0 text-xs font-medium text-ink">Filter ledger</p>
+              <p className="truncate text-xs text-ink-muted">
                 {hasFilters
                   ? "Matching expenses."
                   : "Search expenses by title, vendor, notes, or submitter."}
@@ -251,7 +260,7 @@ export default function Expenses() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
             <div className="md:col-span-6">
               <label className="field-label" htmlFor="expense-search">
                 Search
@@ -272,13 +281,14 @@ export default function Expenses() {
                     setQ(event.target.value);
                     setPage(1);
                   }}
-                  className="w-full h-10 pl-9 pr-3 bg-paper-deep border border-rule rounded-sm text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:bg-paper focus:border-cinnabar-500 focus:ring-2 focus:ring-cinnabar-500/15 transition-colors"
+                  className="w-full h-10 md:h-9 pl-9 pr-3 bg-paper border border-rule rounded-sm text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-moss-500 focus:ring-2 focus:ring-moss-500/15 transition-colors"
                 />
               </div>
             </div>
             <div className="md:col-span-3">
               <Select
                 label="Status"
+                className="md:h-9"
                 value={status}
                 onChange={(event) => {
                   setStatus(event.target.value);
@@ -295,6 +305,7 @@ export default function Expenses() {
             <div className="md:col-span-3">
               <Select
                 label="Category"
+                className="md:h-9"
                 value={category}
                 onChange={(event) => {
                   setCategory(event.target.value);
@@ -313,22 +324,12 @@ export default function Expenses() {
         </div>
       </section>
 
-      <Panel className="mt-3">
-        <PanelHeader
-          action={
-            <Button
-              variant="ghost"
-              size="sm"
-              iconLeft={<RefreshCw size={14} />}
-              onClick={retryLoad}
-              disabled={loading}
-            >
-              Refresh
-            </Button>
-          }
-        >
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-            <PanelTitle>Expense ledger</PanelTitle>
+      <Panel className="mt-2">
+        <div className="flex items-center justify-between border-b border-rule px-4 py-2 sm:px-5">
+          <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+            <h2 className="font-display text-sm font-medium text-ink">
+              Expense ledger
+            </h2>
             <span className="text-xs text-ink-muted hidden sm:inline">-</span>
             <span className="text-xs text-ink-muted">
               {rows.length} of {count} shown - Total{" "}
@@ -337,7 +338,7 @@ export default function Expenses() {
               </span>
             </span>
           </div>
-        </PanelHeader>
+        </div>
 
         {loading ? (
           <div className="py-14 flex flex-col items-center justify-center gap-3 text-sm text-ink-muted">
@@ -398,12 +399,12 @@ export default function Expenses() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-rule">
+                <tbody className="divide-y divide-rule/50">
                   {rows.map((expense) => (
                     <tr
                       key={expense.id}
                       onClick={() => setDetail(expense)}
-                      className="cursor-pointer hover:bg-paper-deep/60 transition-colors"
+                      className="cursor-pointer hover:bg-paper-deep/40 transition-colors"
                     >
                       <td className="py-2.5 pl-5 text-ink-soft text-xs whitespace-nowrap w-28">
                         {formatDate(
@@ -449,13 +450,13 @@ export default function Expenses() {
               </table>
             </div>
 
-            <div className="md:hidden divide-y divide-rule">
+            <div className="md:hidden divide-y divide-rule/50">
               {rows.map((expense) => (
                 <button
                   key={expense.id}
                   type="button"
                   onClick={() => setDetail(expense)}
-                  className="w-full px-4 py-3.5 text-left hover:bg-paper-deep/60 transition-colors"
+                  className="w-full px-4 py-3.5 text-left hover:bg-paper-deep/40 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -558,8 +559,10 @@ export default function Expenses() {
               Number(submitterId) === Number(user.id);
             const isPending =
               String(detail.status ?? "").toUpperCase() === "PENDING";
+            const isRejected =
+              String(detail.status ?? "").toUpperCase() === "REJECTED";
 
-            if (!isSubmitter || !isPending) return;
+            if (!isSubmitter || (!isPending && !isRejected)) return;
 
             setEditing(detail);
             setDetail(null);
@@ -577,79 +580,7 @@ export default function Expenses() {
   );
 }
 
-function CenteredExpenseModal({
-  open,
-  onClose,
-  title,
-  description,
-  children,
-  size = "lg",
-}) {
-  const ref = useRef(null);
-  const widths = {
-    md: "max-w-md",
-    lg: "max-w-lg",
-    xl: "max-w-2xl",
-  };
-
-  useEffect(() => {
-    const dlg = ref.current;
-    if (!dlg) return;
-    if (open && !dlg.open) dlg.showModal();
-    if (!open && dlg.open) dlg.close();
-  }, [open]);
-
-  useEffect(() => {
-    const dlg = ref.current;
-    if (!dlg) return undefined;
-    const handle = (event) => {
-      if (event.target === dlg) onClose?.();
-    };
-    dlg.addEventListener("close", handle);
-    return () => dlg.removeEventListener("close", handle);
-  }, [onClose]);
-
-  return (
-    <dialog
-      ref={ref}
-      onClick={(event) => {
-        if (event.target === ref.current) onClose?.();
-      }}
-      className={cn(
-        "mx-auto max-h-[100dvh] w-full max-w-[calc(100vw-1rem)] p-0 bg-transparent text-ink sm:max-h-[90vh]",
-        "backdrop:bg-inkwell-900/40 backdrop:backdrop-blur-sm",
-        "open:animate-drawer",
-        widths[size],
-      )}
-    >
-      <div className="m-2 max-h-[calc(100dvh-1rem)] bg-paper border border-rule rounded-md shadow-pop overflow-hidden sm:m-6 sm:max-h-[calc(90vh-3rem)]">
-        <header className="flex items-start justify-between gap-3 px-4 py-3.5 border-b border-rule sm:px-5 sm:py-4">
-          <div className="min-w-0">
-            <h2 className="font-display text-xl font-medium leading-tight text-ink">
-              {title}
-            </h2>
-            {description && (
-              <p className="mt-1 text-sm text-ink-muted leading-snug">
-                {description}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="shrink-0 -mr-1.5 -mt-1 p-1.5 rounded-sm text-ink-muted hover:text-ink hover:bg-paper-deep transition-colors"
-          >
-            <X size={18} strokeWidth={1.5} />
-          </button>
-        </header>
-        <div className="max-h-[calc(100dvh-10rem)] overflow-y-auto px-4 py-4 sm:max-h-[calc(90vh-9rem)] sm:px-5">
-          {children}
-        </div>
-      </div>
-    </dialog>
-  );
-}
+/* ---------- Expense Editor Modal ---------- */
 
 function ExpenseEditor({
   editing,
@@ -712,17 +643,40 @@ function ExpenseEditor({
   };
 
   return (
-    <CenteredExpenseModal
+    <Modal
       open
       onClose={onClose}
-      title={editing ? "Edit expense" : "Add expense"}
-      description={editing ? "Update this expense." : "Record a business cost."}
+      title={
+        editing
+          ? String(editing.status ?? "").toUpperCase() === "REJECTED"
+            ? "Correct and resubmit"
+            : "Edit expense"
+          : "Add expense"
+      }
+      description={
+        editing
+          ? String(editing.status ?? "").toUpperCase() === "REJECTED"
+            ? "Update the rejected expense. Saving sends it back for owner review."
+            : "Update this expense."
+          : "Record a business cost."
+      }
       size="lg"
     >
       <form onSubmit={submit} className="space-y-5" noValidate>
         {(err.detail || err.error || err.non_field_errors) && (
           <div className="rounded-sm border border-cinnabar-200 bg-cinnabar-50 px-3 py-2 text-sm text-cinnabar-700">
             {err.detail || err.error || err.non_field_errors}
+          </div>
+        )}
+
+        {String(editing?.status ?? "").toUpperCase() === "REJECTED" && (
+          <div className="rounded-sm border border-saffron-200 bg-saffron-50 px-3 py-2.5 text-sm text-saffron-800">
+            <p className="font-medium">Owner requested correction</p>
+            <p className="mt-1 text-xs leading-relaxed">
+              {editing.rejection_reason?.trim()
+                ? editing.rejection_reason
+                : "No reason was provided. Update the details and resubmit for review."}
+            </p>
           </div>
         )}
 
@@ -846,7 +800,9 @@ function ExpenseEditor({
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-rule pt-4">
           <p className="text-xs text-ink-muted">
-            {isStaff
+            {String(editing?.status ?? "").toUpperCase() === "REJECTED"
+              ? "Saving will move this expense back to Pending."
+              : isStaff
               ? "Saved expenses go to the owner for approval."
               : "Approval handling follows backend rules."}
           </p>
@@ -863,7 +819,9 @@ function ExpenseEditor({
               {submitting
                 ? "Saving..."
                 : editing
-                  ? "Update expense"
+                  ? String(editing.status ?? "").toUpperCase() === "REJECTED"
+                    ? "Resubmit expense"
+                    : "Update expense"
                   : "Save expense"}
             </Button>
           </div>
@@ -878,9 +836,11 @@ function ExpenseEditor({
           onClose();
         }}
       />
-    </CenteredExpenseModal>
+    </Modal>
   );
 }
+
+/* ---------- Expense Detail Modal ---------- */
 
 function ExpenseDetail({ row, currency, currentUserId, onClose, onEdit }) {
   const [receiptPreviewFailed, setReceiptPreviewFailed] = useState(false);
@@ -891,7 +851,8 @@ function ExpenseDetail({ row, currency, currentUserId, onClose, onEdit }) {
     submitterId != null &&
     Number(submitterId) === Number(currentUserId);
   const isPending = String(row?.status ?? "").toUpperCase() === "PENDING";
-  const canEdit = isSubmitter && isPending;
+  const isRejected = String(row?.status ?? "").toUpperCase() === "REJECTED";
+  const canEdit = isSubmitter && (isPending || isRejected);
   const receiptIsImage = Boolean(
     receiptUrl &&
       /\.(avif|bmp|gif|jpe?g|png|svg|webp)(?:[?#].*)?$/i.test(receiptUrl),
@@ -1042,13 +1003,24 @@ function ExpenseDetail({ row, currency, currentUserId, onClose, onEdit }) {
               {row.description || "No description provided."}
             </p>
           </div>
+
+          {isRejected && (
+            <div className="mt-3 rounded-sm border border-saffron-200 bg-saffron-50 px-3 py-2.5">
+              <h4 className="text-xs font-medium text-saffron-800">Correction requested</h4>
+              <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-snug text-saffron-800">
+                {row.rejection_reason?.trim()
+                  ? row.rejection_reason
+                  : "No reason was provided. Update and resubmit this expense if needed."}
+              </p>
+            </div>
+          )}
         </section>
       </div>
 
       <div className="mt-4 flex flex-col gap-2.5 border-t border-rule pt-3 sm:flex-row sm:items-center sm:justify-between">
         {!canEdit && (
           <p className="text-[11px] leading-snug text-ink-muted">
-            Only pending expenses submitted by you can be edited.
+            Only pending or rejected expenses submitted by you can be edited.
           </p>
         )}
         <div className="flex flex-col-reverse gap-2 sm:ml-auto sm:flex-row sm:items-center sm:justify-end">
@@ -1057,7 +1029,7 @@ function ExpenseDetail({ row, currency, currentUserId, onClose, onEdit }) {
           </Button>
           {canEdit && (
             <Button variant="primary" onClick={onEdit}>
-              Edit
+              {isRejected ? "Correct & resubmit" : "Edit"}
             </Button>
           )}
         </div>

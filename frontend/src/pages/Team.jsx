@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Mail, Plus, RefreshCw, Search, ShieldCheck, Trash2, X } from 'lucide-react';
 import api from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { Panel, PanelHeader, PanelTitle } from '../components/Panel.jsx';
-import { PageHeader } from '../components/PageHeader.jsx';
 import Button from '../components/Button.jsx';
 import { Input, Select } from '../components/Field.jsx';
 import { Modal } from '../components/Modal.jsx';
@@ -20,13 +19,6 @@ const ROLES = [
 ];
 
 const roleLabel = (role) => ROLES.find((item) => item.value === role)?.label ?? role ?? 'Member';
-
-const pageRoleLabel = (role) => {
-  const normalized = String(role ?? '').toUpperCase();
-  if (normalized === 'OWNER') return 'Owner team management';
-  if (normalized === 'STAFF') return 'Staff team view';
-  return 'Workspace team management';
-};
 
 const memberName = (member) => (
   member?.user?.full_name
@@ -47,7 +39,9 @@ export default function Team() {
   const [loadErrors, setLoadErrors] = useState([]);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState(null);
+  const [cancelInviteTarget, setCancelInviteTarget] = useState(null);
   const [removing, setRemoving] = useState(false);
+  const [cancellingInvite, setCancellingInvite] = useState(false);
   const [savingRoleId, setSavingRoleId] = useState(null);
   const [q, setQ] = useState('');
 
@@ -58,9 +52,10 @@ export default function Team() {
   const [invitesPage, setInvitesPage] = useState(1);
 
   const organizationId = organization?.id;
+  const isOwner = String(role ?? '').toUpperCase() === 'OWNER';
   const isExplicitStaff = String(role ?? '').toUpperCase() === 'STAFF';
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     setLoading(true);
     setLoadErrors([]);
 
@@ -70,7 +65,7 @@ export default function Team() {
 
     Promise.allSettled([
       memberRequest,
-      api.get('/invitations/'),
+      isOwner ? api.get('/invitations/') : Promise.resolve({ data: [] }),
     ])
       .then(([memberResult, inviteResult]) => {
         const errors = [];
@@ -95,9 +90,9 @@ export default function Team() {
         setLoadErrors(errors);
       })
       .finally(() => setLoading(false));
-  };
+  }, [organizationId, isOwner]);
 
-  useEffect(() => { refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
     setMembersPage(1);
@@ -185,28 +180,50 @@ export default function Team() {
     }
   };
 
+  const cancelInvite = async () => {
+    if (!cancelInviteTarget?.id) return;
+
+    setCancellingInvite(true);
+    try {
+      await api.post(`/invitations/${cancelInviteTarget.id}/cancel/`);
+      toast.success('Invitation cancelled.');
+      setInvites((current) => current.filter((invite) => invite.id !== cancelInviteTarget.id));
+      setCancelInviteTarget(null);
+      refresh();
+    } catch (error) {
+      const data = error?.response?.data;
+      const backendMessage = data?.detail || data?.error || data?.message || (Array.isArray(data?.non_field_errors) ? data.non_field_errors.join(' ') : data?.non_field_errors);
+      toast.error(backendMessage || 'Could not cancel invitation.');
+    } finally {
+      setCancellingInvite(false);
+    }
+  };
+
   const clearSearch = () => setQ('');
+  const pageActions = useMemo(
+    () => (
+      <>
+        {isOwner && (
+          <Button variant="primary" size="sm" iconRight={<Plus size={14} />} onClick={() => setInviteOpen(true)} disabled={!organizationId}>
+            Invite by email
+          </Button>
+        )}
+        <Button variant="secondary" size="sm" iconLeft={<RefreshCw size={14} />} onClick={refresh} disabled={loading}>
+          Refresh
+        </Button>
+      </>
+    ),
+    [refresh, loading, isOwner, organizationId],
+  );
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-6 sm:py-4 lg:px-10">
-      <PageHeader
-        byline={`${pageRoleLabel(role)}${organization?.name ? ` - ${organization.name}` : ''}`}
-        title="Team"
-        lede="Manage members and invitations."
-        actions={
-          <>
-            <Button variant="secondary" size="sm" iconLeft={<RefreshCw size={14} />} onClick={refresh} disabled={loading}>
-              Refresh
-            </Button>
-            <Button variant="primary" size="sm" iconRight={<Plus size={14} />} onClick={() => setInviteOpen(true)} disabled={!organizationId}>
-              Invite by email
-            </Button>
-          </>
-        }
-      />
+      <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5 border-b border-rule pb-2" aria-label="Team actions">
+        {pageActions}
+      </div>
 
       {!organizationId && (
-        <div className="mt-3 rounded-sm border border-rule bg-paper-deep px-3 py-2 text-sm text-ink-soft">
+        <div className="rounded-sm border border-rule bg-paper-deep px-3 py-2 text-sm text-ink-soft">
           Select an organization before managing team access.
         </div>
       )}
@@ -214,20 +231,22 @@ export default function Team() {
       {isExplicitStaff && (
         <div className="mt-3 flex items-start gap-2 rounded-sm border border-rule bg-paper-deep px-3 py-2 text-sm text-ink-soft">
           <ShieldCheck size={16} className="mt-0.5 shrink-0 text-ink-muted" strokeWidth={1.5} aria-hidden="true" />
-          <p>Owner-managed area. Backend permissions still apply.</p>
+          <p>You can view team members, but only owners can manage invitations and roles.</p>
         </div>
       )}
 
-      <section className="mt-4 border-t border-rule pt-3" aria-label="Team summary">
+      <section className="mt-2 border-t border-rule pt-3" aria-label="Team summary">
         <p className="text-sm font-medium text-ink">Summary</p>
         <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryMetric label="Members" value={summary.memberCount} />
           <SummaryMetric label="Owners" value={summary.ownerCount} />
           <SummaryMetric label="Staff" value={summary.staffCount} />
-          <SummaryMetric
-            label="Invites"
-            value={summary.inviteCount > 0 ? summary.inviteCount : 'No pending invites'}
-          />
+          {isOwner && (
+            <SummaryMetric
+              label="Invites"
+              value={summary.inviteCount > 0 ? summary.inviteCount : 'No pending invites'}
+            />
+          )}
         </div>
       </section>
 
@@ -249,7 +268,9 @@ export default function Team() {
           </div>
           <div className="md:col-span-6 flex items-end justify-between gap-3">
             <p className="pb-2 text-xs text-ink-muted">
-              {filteredMembers.length} members - {filteredInvites.length} invites
+              {isOwner
+                ? `${filteredMembers.length} members - ${filteredInvites.length} invites`
+                : `${filteredMembers.length} members`}
             </p>
             {hasSearch && (
               <Button variant="ghost" size="sm" onClick={clearSearch}>Clear search</Button>
@@ -282,8 +303,8 @@ export default function Team() {
             ) : members.length === 0 ? (
               <EmptyState
                 title="No members found"
-                description={organizationId ? 'Invite your first teammate.' : 'Select an organization to load members.'}
-                action={organizationId ? <Button variant="primary" iconRight={<Plus size={14} />} onClick={() => setInviteOpen(true)}>Send invite</Button> : null}
+                description={organizationId ? 'Team members will appear here.' : 'Select an organization to load members.'}
+                action={isOwner && organizationId ? <Button variant="primary" iconRight={<Plus size={14} />} onClick={() => setInviteOpen(true)}>Send invite</Button> : null}
               />
             ) : filteredMembers.length === 0 ? (
               <EmptyState
@@ -302,6 +323,7 @@ export default function Team() {
                       savingRoleId={savingRoleId}
                       onRoleChange={changeRole}
                       onRemove={() => setRemoveTarget(member)}
+                      canManage={isOwner}
                     />
                   ))}
                 </ul>
@@ -316,42 +338,49 @@ export default function Team() {
             )}
           </Panel>
 
-          <Panel className="mt-4">
-            <PanelHeader>
-              <PanelTitle>Pending invitations</PanelTitle>
-              <p className="text-xs text-ink-muted mt-0.5">{filteredInvites.length} of {invites.length} shown</p>
-            </PanelHeader>
-            {loading ? (
-              <LoadingBlock message="Loading invitations..." />
-            ) : invites.length === 0 ? (
-              <EmptyState
-                title="No pending invitations"
-                description="Pending invites will appear here."
-                action={organizationId ? <Button variant="secondary" iconRight={<Plus size={14} />} onClick={() => setInviteOpen(true)}>Invite teammate</Button> : null}
-              />
-            ) : filteredInvites.length === 0 ? (
-              <EmptyState
-                title="No invitations match this search"
-                description="Clear the search to return to pending invitations."
-                action={<Button variant="secondary" onClick={clearSearch}>Clear search</Button>}
-              />
-            ) : (
-              <>
-                <ul className="divide-y divide-rule">
-                  {pagedInvites.map((invite) => (
-                    <InviteRow key={invite.id ?? invite.email} invite={invite} />
-                  ))}
-                </ul>
-
-                <PaginationControls
-                  page={invitesPage}
-                  setPage={setInvitesPage}
-                  pageSize={invitesPageSize}
-                  totalItems={filteredInvites.length}
+          {isOwner && (
+            <Panel className="mt-4">
+              <PanelHeader>
+                <PanelTitle>Pending invitations</PanelTitle>
+                <p className="text-xs text-ink-muted mt-0.5">{filteredInvites.length} of {invites.length} shown</p>
+              </PanelHeader>
+              {loading ? (
+                <LoadingBlock message="Loading invitations..." />
+              ) : invites.length === 0 ? (
+                <EmptyState
+                  title="No pending invitations"
+                  description="Pending invites will appear here."
+                  action={organizationId ? <Button variant="secondary" iconRight={<Plus size={14} />} onClick={() => setInviteOpen(true)}>Invite teammate</Button> : null}
                 />
-              </>
-            )}
-          </Panel>
+              ) : filteredInvites.length === 0 ? (
+                <EmptyState
+                  title="No invitations match this search"
+                  description="Clear the search to return to pending invitations."
+                  action={<Button variant="secondary" onClick={clearSearch}>Clear search</Button>}
+                />
+              ) : (
+                <>
+                  <ul className="divide-y divide-rule">
+                    {pagedInvites.map((invite) => (
+                      <InviteRow
+                        key={invite.id ?? invite.email}
+                        invite={invite}
+                        canCancel={isOwner}
+                        onCancel={() => setCancelInviteTarget(invite)}
+                      />
+                    ))}
+                  </ul>
+
+                  <PaginationControls
+                    page={invitesPage}
+                    setPage={setInvitesPage}
+                    pageSize={invitesPageSize}
+                    totalItems={filteredInvites.length}
+                  />
+                </>
+              )}
+            </Panel>
+          )}
         </>
       )}
 
@@ -368,6 +397,15 @@ export default function Team() {
           removing={removing}
           onClose={() => !removing && setRemoveTarget(null)}
           onConfirm={remove}
+        />
+      )}
+
+      {cancelInviteTarget && (
+        <CancelInviteDialog
+          invite={cancelInviteTarget}
+          cancelling={cancellingInvite}
+          onClose={() => !cancellingInvite && setCancelInviteTarget(null)}
+          onConfirm={cancelInvite}
         />
       )}
     </div>
@@ -392,7 +430,7 @@ function SummaryMetric({ label, value }) {
   );
 }
 
-function MemberRow({ member, currentUser, savingRoleId, onRoleChange, onRemove }) {
+function MemberRow({ member, currentUser, savingRoleId, onRoleChange, onRemove, canManage }) {
   const isSelf = member.user?.id === currentUser?.id;
   const saving = savingRoleId === member.id;
 
@@ -410,18 +448,24 @@ function MemberRow({ member, currentUser, savingRoleId, onRoleChange, onRemove }
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-          <div className="w-full sm:w-36">
-            <Select
-              value={member.role}
-              onChange={(event) => onRoleChange(member, event.target.value)}
-              disabled={isSelf || saving}
-            >
-              {ROLES.map((roleOption) => <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>)}
-            </Select>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onRemove} disabled={isSelf || saving} iconLeft={<X size={14} />}>
-            Remove
-          </Button>
+          {canManage ? (
+            <>
+              <div className="w-full sm:w-36">
+                <Select
+                  value={member.role}
+                  onChange={(event) => onRoleChange(member, event.target.value)}
+                  disabled={isSelf || saving}
+                >
+                  {ROLES.map((roleOption) => <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>)}
+                </Select>
+              </div>
+              <Button variant="ghost" size="sm" onClick={onRemove} disabled={isSelf || saving} iconLeft={<X size={14} />}>
+                Remove
+              </Button>
+            </>
+          ) : (
+            <Badge tone={member.role === 'OWNER' ? 'moss' : 'saffron'}>{roleLabel(member.role)}</Badge>
+          )}
         </div>
       </div>
       {saving && <p className="mt-2 text-xs text-ink-muted">Saving role change...</p>}
@@ -429,7 +473,7 @@ function MemberRow({ member, currentUser, savingRoleId, onRoleChange, onRemove }
   );
 }
 
-function InviteRow({ invite }) {
+function InviteRow({ invite, canCancel, onCancel }) {
   return (
     <li className="px-4 py-3.5 sm:px-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -443,7 +487,14 @@ function InviteRow({ invite }) {
           </div>
         </div>
         <div className="sm:shrink-0">
-          <Badge tone={isPendingInvite(invite) ? 'saffron' : 'moss'}>{invite.status ?? 'PENDING'}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge tone={isPendingInvite(invite) ? 'saffron' : 'moss'}>{invite.status ?? 'PENDING'}</Badge>
+            {canCancel && isPendingInvite(invite) && (
+              <Button variant="danger" size="xs" onClick={onCancel}>
+                Cancel
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </li>
@@ -468,8 +519,15 @@ function InviteEditor({ onClose, onSaved }) {
     setErr({});
     setSaving(true);
     try {
-      await api.post(`/organizations/${organizationId}/invite/`, form);
-      toast.success(`Invite sent to ${form.email}.`);
+      const response = await api.post(`/organizations/${organizationId}/invite/`, form);
+      if (response?.data?.email_sent) {
+        toast.success('Invitation email sent.');
+      } else {
+        toast.info(
+          'Invitation was created, but email could not be sent. Copy the invite link from backend/admin or check email settings.',
+          { title: 'Email not sent', duration: 8000 }
+        );
+      }
       onSaved();
     } catch (error) {
       const data = error?.response?.data;
@@ -553,6 +611,31 @@ function RemoveMemberDialog({ member, removing, onClose, onConfirm }) {
           <Button variant="ghost" onClick={onClose} disabled={removing}>Cancel</Button>
           <Button variant="danger" onClick={onConfirm} disabled={removing} iconLeft={<Trash2 size={14} />}>
             {removing ? 'Removing...' : 'Remove member'}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function CancelInviteDialog({ invite, cancelling, onClose, onConfirm }) {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Cancel invitation?"
+      description="This makes the invitation email link stop working."
+      size="sm"
+    >
+      <div className="space-y-4">
+        <div className="rounded-sm border border-rule bg-paper-deep px-3 py-3 text-sm">
+          <p className="font-medium text-ink">{invite.email ?? 'No email recorded'}</p>
+          <p className="mt-1 text-xs text-ink-muted">{roleLabel(invite.role)} - {invite.status ?? 'PENDING'}</p>
+        </div>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <Button variant="ghost" onClick={onClose} disabled={cancelling}>Keep invitation</Button>
+          <Button variant="danger" onClick={onConfirm} disabled={cancelling} iconLeft={<X size={14} />}>
+            {cancelling ? 'Cancelling...' : 'Cancel invitation'}
           </Button>
         </div>
       </div>

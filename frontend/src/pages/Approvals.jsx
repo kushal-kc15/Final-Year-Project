@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
   FileText,
@@ -11,7 +11,6 @@ import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useToast } from "../components/Toast.jsx";
 import { Panel, PanelHeader, PanelTitle } from "../components/Panel.jsx";
-import { PageHeader } from "../components/PageHeader.jsx";
 import Button from "../components/Button.jsx";
 import { Avatar } from "../components/Avatar.jsx";
 import { StatusPill } from "../components/StatusPill.jsx";
@@ -59,13 +58,6 @@ const expenseTitle = (expense) =>
   expense?.description ??
   "Untitled expense";
 
-const roleLabel = (role) => {
-  const normalized = String(role ?? "").toUpperCase();
-  if (normalized === "OWNER") return "Owner view";
-  if (normalized === "STAFF") return "Staff view";
-  return "Approval view";
-};
-
 const emptyCopy = (tab) => {
   if (tab === "PENDING") {
     return {
@@ -86,7 +78,7 @@ const emptyCopy = (tab) => {
 };
 
 export default function Approvals() {
-  const { currency, role, organization } = useAuth();
+  const { currency, role } = useAuth();
   const toast = useToast();
   const [tab, setTab] = useState("PENDING");
   const [rows, setRows] = useState([]);
@@ -151,13 +143,13 @@ export default function Approvals() {
       setNote("");
       setConfirming(null);
     }
-  }, [pagedRows]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pagedRows]);
 
   const selectedAmount = selected ? (
     <Money value={selected.amount} currency={selected.currency ?? currency} />
   ) : null;
 
-  const refresh = () => setRefreshKey((key) => key + 1);
+  const refresh = useCallback(() => setRefreshKey((key) => key + 1), []);
 
   const decide = async (decision) => {
     if (!selected) return;
@@ -203,26 +195,28 @@ export default function Approvals() {
     setConfirming(decision);
   };
 
+  const pageActions = useMemo(
+    () => (
+      <Button
+        variant="secondary"
+        size="sm"
+        iconLeft={<RefreshCw size={14} />}
+        onClick={refresh}
+        disabled={loading || busy}
+      >
+        Refresh
+      </Button>
+    ),
+    [refresh, loading, busy],
+  );
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-2 sm:px-6 sm:py-3 lg:px-10">
-      <PageHeader
-        byline={`${roleLabel(role)}${organization?.name ? ` - ${organization.name}` : ""}`}
-        title="Approvals"
-        lede="Review and decide on submitted expenses."
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            iconLeft={<RefreshCw size={14} />}
-            onClick={refresh}
-            disabled={loading || busy}
-          >
-            Refresh
-          </Button>
-        }
-      />
+      <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5 border-b border-rule pb-2" aria-label="Approval actions">
+        {pageActions}
+      </div>
 
-      <div className="mt-1 flex flex-col gap-2 border-b border-rule sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 border-b border-rule sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-1 overflow-x-auto">
           {TABS.map((item) => {
             const active = item.value === tab;
@@ -233,8 +227,8 @@ export default function Approvals() {
                 onClick={() => setTab(item.value)}
                 className={cn(
                   "h-9 shrink-0 px-3 text-sm transition-colors",
-                  active
-                    ? "text-ink font-medium border-b-2 border-cinnabar-500 -mb-px"
+                    active
+                    ? "text-ink font-medium border-b-2 border-moss-500 -mb-px"
                     : "text-ink-muted hover:text-ink",
                 )}
               >
@@ -510,7 +504,7 @@ function ApprovalDetail({
                   href={selected.receipt}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-cinnabar-600 hover:underline"
+                  className="inline-flex items-center gap-1.5 text-ink-muted hover:text-ink hover:underline"
                 >
                   <FileText size={14} strokeWidth={1.5} aria-hidden="true" />
                   Open receipt
@@ -641,7 +635,7 @@ function DecisionDialog({
       description={
         approving
           ? "This will mark the expense as approved and remove it from the pending queue."
-          : "This will reject the submitted expense and remove it from the pending queue."
+          : "This will send the expense back to the submitter for correction."
       }
       size="sm"
     >
