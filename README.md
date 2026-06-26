@@ -13,7 +13,7 @@ Many small businesses track spending through spreadsheets, chat messages, paper 
 - Multi-workspace organization support
 - Owner and staff roles
 - Expense submission with category, vendor, amount, date, and receipt
-- Receipt upload with OCR-assisted data extraction
+- Receipt upload with Gemini Vision AI-assisted data extraction
 - Approval, rejection, correction, and resubmission workflow
 - Budget tracking with threshold alerts
 - Approved-only analytics and CSV exports
@@ -45,9 +45,8 @@ Many small businesses track spending through spreadsheets, chat messages, paper 
 - SQLite for local development
 - PostgreSQL supported through `DATABASE_URL`
 
-**OCR and AI integrations**
-- NVIDIA/OpenAI-compatible vision OCR configuration
-- FreeModel OCR fallback configuration
+**AI integrations**
+- Gemini Vision receipt scanning through the Django backend
 - Optional AI finance insights endpoint
 
 ## Screenshots
@@ -149,9 +148,8 @@ More testing notes are in [docs/TESTING.md](docs/TESTING.md).
 
 ## Project Status
 
-This project was completed as a final-year academic project. The core expense management, organization scoping, role-based workflows, reporting, team invitation, OCR, and admin-dashboard features are implemented.
+This project was completed as a final-year academic project. The core expense management, organization scoping, role-based workflows, reporting, team invitation, AI receipt scanning, and admin-dashboard features are implemented.
 
 ## Future Scope
 
 Planned improvements include production deployment hardening, PDF reports, richer audit trails, mobile access, organization billing, and more advanced analytics.
-

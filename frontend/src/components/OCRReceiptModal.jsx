@@ -6,17 +6,8 @@ import { Modal } from './Modal.jsx';
 import { Input, Select, Textarea } from './Field.jsx';
 import { Money } from './Money.jsx';
 import { cn } from '../lib/utils.js';
+import { EXPENSE_CATEGORIES } from '../lib/categories.js';
 const PROCESSING = ['PENDING', 'PROCESSING'];
-const CATEGORIES = [
-  { value: 'FOOD', label: 'Food & Dining' },
-  { value: 'TRANSPORT', label: 'Transportation' },
-  { value: 'OFFICE', label: 'Office Supplies' },
-  { value: 'UTILITIES', label: 'Utilities' },
-  { value: 'SALARY', label: 'Salary & Wages' },
-  { value: 'RENT', label: 'Rent' },
-  { value: 'MARKETING', label: 'Marketing' },
-  { value: 'OTHER', label: 'Other' },
-];
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const REVIEWABLE = ['COMPLETED', 'VERIFIED'];
@@ -95,14 +86,20 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
   };
 
   const hydrateForm = (data) => {
+    const scan = data.scan || {};
+    const vendor = data.vendor_name ?? scan.vendor ?? '';
+    const amount = data.total_amount ?? scan.amount ?? '';
+    const receiptDate = data.receipt_date ?? scan.date ?? new Date().toISOString().slice(0, 10);
+    const category = data.category ?? scan.category ?? 'OTHER';
+    const description = data.description ?? scan.notes ?? 'Created from AI receipt scan';
     setReceipt(data);
     setForm({
-      vendor_name: data.vendor_name ?? '',
-      total_amount: data.total_amount ?? '',
-      receipt_date: data.receipt_date ?? new Date().toISOString().slice(0, 10),
-      category: data.category || 'OTHER',
-      description: data.description || 'Auto-created from receipt OCR',
-      title: data.vendor_name ? `Receipt from ${data.vendor_name}` : 'Receipt expense',
+      vendor_name: vendor,
+      total_amount: amount,
+      receipt_date: receiptDate,
+      category,
+      description,
+      title: vendor ? `Receipt from ${vendor}` : 'Receipt expense',
     });
   };
 
@@ -117,7 +114,7 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
       if (!PROCESSING.includes(res.data.status)) return res.data;
     }
     throw new Error(
-      'OCR is still processing. Keep the receipt saved and try scanning again in a moment, or enter the expense manually.'
+      'AI receipt scanning is still processing. Keep the receipt saved and try scanning again in a moment, or enter the expense manually.'
     );
   };
 
@@ -135,16 +132,19 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
     try {
       const res = await api.post('/receipts/', body, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000,
       });
       hydrateForm(res.data);
       if (PROCESSING.includes(res.data.status)) await pollReceipt(res.data.id);
     } catch (err) {
+      const timedOut = err?.code === 'ECONNABORTED' || String(err?.message || '').toLowerCase().includes('timeout');
       setError(
+        timedOut ? 'AI receipt scanning took too long. Try a clearer image or enter details manually.' :
         err?.response?.data?.image?.[0] ||
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         err?.message ||
-        'OCR could not process this receipt.'
+        'AI receipt scanning failed. Try a clearer image or enter the expense manually.'
       );
     } finally {
       setBusy(false);
@@ -220,7 +220,7 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
     <Modal
       open={open}
       onClose={close}
-      title="Scan receipt"
+      title="Scan receipt with AI"
       description="Upload a receipt image, review the extracted fields, then create the expense."
       size="lg"
       panelClassName="!max-h-[88vh]"
@@ -271,7 +271,7 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
               <div>
                 <h3 className="font-display text-lg text-ink">Less typing, same control.</h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">
-                  OCR fills the vendor, amount, date, category, and notes. Review before anything enters the book.
+                  AI scanning fills the vendor, amount, date, category, and notes. Review before anything enters the book.
                 </p>
               </div>
               <Button
@@ -281,16 +281,16 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
                 iconRight={busy ? <Loader2 size={15} className="animate-spin" /> : <ScanText size={15} />}
                 className="w-full sm:w-auto sm:self-start"
               >
-                {busy ? 'Scanning...' : 'Scan receipt'}
+                {busy ? 'Scanning receipt with AI...' : 'Scan receipt with AI'}
               </Button>
             </div>
           ) : isProcessing ? (
             <div className="flex items-start gap-3 border border-rule bg-paper-deep p-4">
               <Loader2 size={18} className="mt-0.5 animate-spin text-ink-muted" />
               <div>
-                <p className="text-sm font-medium text-ink">OCR is processing</p>
+                <p className="text-sm font-medium text-ink">Scanning receipt with AI</p>
                 <p className="mt-1 text-sm text-ink-muted">
-                  This usually takes a few seconds. Keep this dialog open while the extracted fields are prepared.
+                  Scanning receipt with AI... this may take up to two minutes.
                 </p>
               </div>
             </div>
@@ -302,7 +302,7 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
                   <p className="text-sm font-medium text-cinnabar-800">Receipt scan failed</p>
                   <p className="text-xs text-cinnabar-700">
                     {receipt.error_message ||
-                      'OCR could not read this receipt. Try a clearer image or enter the expense manually.'}
+                      'AI receipt scanning failed. Try a clearer image or enter the expense manually.'}
                   </p>
                 </div>
               </div>
@@ -319,7 +319,7 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
                   disabled={busy || !file}
                   iconRight={busy && <Loader2 size={15} className="animate-spin" />}
                 >
-                  {busy ? 'Scanning...' : 'Try scan again'}
+                  {busy ? 'Scanning receipt with AI...' : 'Try scan again'}
                 </Button>
               </div>
             </div>
@@ -390,7 +390,7 @@ export function OCRReceiptModal({ open, onClose, onCreated }) {
                   value={form.category ?? 'OTHER'}
                   onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
                 >
-                  {CATEGORIES.map((c) => (
+                  {EXPENSE_CATEGORIES.map((c) => (
                     <option key={c.value} value={c.value}>
                       {c.label}
                     </option>

@@ -2,11 +2,18 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.conf import settings
 from django.db import transaction
 from organizations.context import get_active_membership
 from .models import Receipt
 from .serializers import ReceiptSerializer, ReceiptUploadSerializer, ReceiptVerifySerializer
-from .tasks import enqueue_receipt_ocr, PUBLIC_OCR_ERROR
+from .tasks import (
+    PUBLIC_CONFIGURATION_ERROR,
+    PUBLIC_OCR_ERROR,
+    enqueue_receipt_ocr,
+    receipt_scan_response,
+)
+from .services.ai_receipt_extractor import AIReceiptConfigurationError, AIReceiptExtractionError
 from expenses.serializers import ExpenseSerializer
 
 import logging
@@ -34,7 +41,7 @@ class ReceiptViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """
-        Upload receipt image and process with OCR
+        Upload receipt image and process with AI receipt scanning.
         """
         user = request.user
         
@@ -45,6 +52,12 @@ class ReceiptViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         organization = member.organization
+
+        if not getattr(settings, 'AI_RECEIPT_SCAN_ENABLED', True) or not str(getattr(settings, 'GEMINI_API_KEY', '') or '').strip():
+            return Response(
+                {'error': PUBLIC_CONFIGURATION_ERROR, 'message': PUBLIC_CONFIGURATION_ERROR},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         # Validate image upload
         serializer = ReceiptUploadSerializer(data=request.data)
@@ -62,9 +75,29 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         try:
             queue_mode = enqueue_receipt_ocr(receipt.id)
             receipt.refresh_from_db()
+        except AIReceiptConfigurationError:
+            receipt.refresh_from_db()
+            return Response(
+                {
+                    'error': PUBLIC_CONFIGURATION_ERROR,
+                    'message': PUBLIC_CONFIGURATION_ERROR,
+                    'receipt_id': receipt.id,
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except AIReceiptExtractionError:
+            receipt.refresh_from_db()
+            return Response(
+                {
+                    'error': PUBLIC_OCR_ERROR,
+                    'message': PUBLIC_OCR_ERROR,
+                    'receipt_id': receipt.id,
+                },
+                status=status.HTTP_502_BAD_GATEWAY
+            )
         except Exception:
             logger.exception(
-                'Receipt OCR enqueue failed',
+                'Receipt AI scan enqueue failed',
                 extra={
                     'receipt_id': receipt.id,
                     'organization_id': organization.id,
@@ -76,7 +109,7 @@ class ReceiptViewSet(viewsets.ModelViewSet):
             receipt.save(update_fields=['status', 'error_message', 'updated_at'])
             return Response(
                 {
-                    'error': 'OCR processing failed',
+                    'error': 'AI receipt scanning failed',
                     'message': PUBLIC_OCR_ERROR,
                     'receipt_id': receipt.id,
                 },
@@ -87,6 +120,12 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         response_status = status.HTTP_201_CREATED if receipt.status == 'COMPLETED' else status.HTTP_202_ACCEPTED
         response_data = output_serializer.data
         response_data['queue_mode'] = queue_mode
+        if receipt.status in {'COMPLETED', 'VERIFIED'}:
+            scan = receipt_scan_response(receipt)
+            response_data.update(scan)
+            response_data['scan'] = scan
+        else:
+            response_data['scan'] = None
         return Response(response_data, status=response_status)
     
     @action(detail=True, methods=['post'])
@@ -180,7 +219,7 @@ class ReceiptViewSet(viewsets.ModelViewSet):
                 'category': request.data.get('category', receipt.category or 'OTHER'),
                 'vendor': request.data.get('vendor', receipt.vendor_name),
                 'date': request.data.get('date', receipt.receipt_date),
-                'description': request.data.get('description', receipt.description or 'Auto-created from receipt OCR'),
+                'description': request.data.get('description', receipt.description or 'Created from AI receipt scan'),
             }
 
             expense_serializer = ExpenseSerializer(data=expense_data)

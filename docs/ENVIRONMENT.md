@@ -38,7 +38,11 @@ Important variables:
 | `CELERY_BROKER_URL` | Redis broker URL for Celery. |
 | `CELERY_RESULT_BACKEND` | Redis result backend URL for Celery. |
 | `OCR_QUEUE_FALLBACK_SYNC` | Allows synchronous OCR fallback in development. |
-| `OCR_PROVIDER` | OCR provider selector. |
+| `AI_RECEIPT_SCAN_ENABLED` | Enables or disables AI receipt scanning. |
+| `GEMINI_API_KEY` | Gemini API key used by backend-only receipt scanning. Never expose it in frontend code. |
+| `GEMINI_RECEIPT_MODEL` | Gemini model for receipt extraction. Defaults to `gemini-2.5-flash`. |
+| `RECEIPT_OCR_USE_QUEUE` | Enables Celery queueing for receipt scans. Keep `False` for local/demo mode without Redis. |
+| `OCR_PROVIDER` | Legacy OCR provider selector retained for older configuration paths. |
 | `NVIDIA_API_KEY` | API key for NVIDIA/OpenAI-compatible OCR provider. |
 | `FREEMODEL_API_KEY` | API key for FreeModel fallback provider. |
 | `AI_INSIGHTS_MODEL` | Model used by finance insights configuration. |
@@ -84,4 +88,3 @@ EMAIL_HOST_USER=your-email@gmail.com
 EMAIL_HOST_PASSWORD=your-gmail-app-password
 DEFAULT_FROM_EMAIL=noreply@example.com
 ```
-

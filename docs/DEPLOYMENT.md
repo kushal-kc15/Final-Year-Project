@@ -51,7 +51,7 @@ Production must provide real values for:
 - `CSRF_TRUSTED_ORIGINS`
 - `FRONTEND_URL`
 - Email SMTP settings
-- OCR provider keys if OCR is enabled
+- `GEMINI_API_KEY` if AI receipt scanning is enabled
 - Google OAuth client IDs if Google login is enabled
 
 ## Static and Media Files
@@ -77,4 +77,3 @@ This is required for API calls and generated email links.
 ## Email Setup
 
 Use console email only for development. Production invitations, verification emails, and password resets require real SMTP settings.
-

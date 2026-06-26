@@ -199,7 +199,7 @@ export default function Expenses() {
           iconRight={<ScanText size={14} />}
           onClick={() => setOcrOpen(true)}
         >
-          Scan receipt
+          Scan receipt with AI
         </Button>
         <Button
           variant="secondary"
@@ -574,7 +574,17 @@ export default function Expenses() {
       <OCRReceiptModal
         open={ocrOpen}
         onClose={() => setOcrOpen(false)}
-        onCreated={() => setRefreshKey((key) => key + 1)}
+        onCreated={() => {
+          setPage(1);
+          setRefreshKey((key) => key + 1);
+          if (status === "") {
+            toast.success("Expense created from receipt scan.");
+          } else {
+            toast.success(
+              "Expense created from receipt scan. Showing page 1; change filters if you do not see it.",
+            );
+          }
+        }}
       />
     </div>
   );
@@ -706,7 +716,7 @@ function ExpenseEditor({
           <div className="rounded-md border border-rule bg-paper-deep/60 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-ink">Scan a receipt</p>
+                <p className="text-sm font-medium text-ink">Scan receipt with AI</p>
                 <p className="mt-1 text-xs leading-relaxed text-ink-muted">
                   Upload a receipt and review extracted details.
                 </p>
@@ -717,7 +727,7 @@ function ExpenseEditor({
                 iconRight={<ScanText size={14} />}
                 onClick={() => setOcrOpen(true)}
               >
-                Scan receipt
+                Scan receipt with AI
               </Button>
             </div>
             <div className="mt-3 flex items-center gap-3 text-xs text-ink-muted">

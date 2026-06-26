@@ -4,7 +4,7 @@
 
 Deploy the backend and frontend to production infrastructure with PostgreSQL, persistent media storage, HTTPS, monitoring, and backups.
 
-## Advanced OCR
+## Advanced Receipt AI
 
 Improve receipt extraction accuracy with stronger document parsing, vendor detection, tax extraction, currency detection, and duplicate receipt checks.
 
@@ -35,4 +35,3 @@ Introduce custom permission sets beyond owner and staff, such as finance reviewe
 ## Integrations
 
 Future integrations could include accounting tools, bank feeds, Slack or email alerts, and cloud receipt storage.
-

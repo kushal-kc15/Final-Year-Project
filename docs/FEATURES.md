@@ -19,9 +19,9 @@ Users can record expenses with:
 - Receipt attachment
 - Submission status
 
-## Receipt Upload and OCR
+## Receipt Upload and AI Scanning
 
-Receipt files can be uploaded and processed through OCR configuration. The project supports an OpenAI-compatible NVIDIA vision endpoint and a FreeModel fallback configuration, with synchronous fallback behavior for development.
+Receipt files can be uploaded and scanned with Gemini Vision through the Django backend. API keys stay server-side, and extracted fields are shown to the user for review before an expense is created.
 
 ## Approval and Rejection Workflow
 
@@ -62,4 +62,3 @@ The frontend supports light, dark, and system theme preferences.
 ## Notifications and Activity Logs
 
 The backend includes notifications and activity logs for important system events such as expense changes, approvals, invitations, and budget-related activity.
-

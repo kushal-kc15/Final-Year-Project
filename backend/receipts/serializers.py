@@ -1,12 +1,9 @@
 from rest_framework import serializers
 from django.conf import settings
-from decouple import config
 from decimal import Decimal
 from PIL import Image, UnidentifiedImageError
 from .models import Receipt
 from expenses.models import Expense
-
-NVIDIA_ALLOWED_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
 
 
 class ReceiptSerializer(serializers.ModelSerializer):
@@ -45,8 +42,6 @@ class ReceiptUploadSerializer(serializers.ModelSerializer):
 
         content_type = getattr(image, 'content_type', '')
         allowed_content_types = set(settings.RECEIPT_ALLOWED_CONTENT_TYPES)
-        if config('OCR_PROVIDER', default='nvidia').strip().lower() == 'nvidia':
-            allowed_content_types &= NVIDIA_ALLOWED_CONTENT_TYPES
         if content_type not in allowed_content_types:
             raise serializers.ValidationError('Unsupported receipt image type.')
 

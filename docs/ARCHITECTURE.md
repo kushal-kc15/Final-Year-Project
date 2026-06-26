@@ -33,7 +33,7 @@ backend/
   expenses/              Expense records and approval workflow
   budgets/               Budgets and budget alerts
   analytics/             Reports, trends, CSV export, insights
-  receipts/              Receipt upload and OCR processing
+  receipts/              Receipt upload and AI scanning
   notifications/         User notifications
   activity_logs/         System and workspace activity
   vyapar_margadarshan/   Project settings, URLs, ASGI/WSGI
@@ -64,4 +64,3 @@ The organization membership model links a user to an organization with either `O
 ## Admin Console
 
 The Django Admin interface uses Jazzmin and is configured as a website manager console. It gives superusers platform-level access to users, organizations, expenses, budgets, receipts, notifications, and activity logs.
-

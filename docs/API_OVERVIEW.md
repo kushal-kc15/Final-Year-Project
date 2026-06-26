@@ -116,7 +116,7 @@ Base path:
 /api/receipts/
 ```
 
-Used for receipt upload, OCR processing, and receipt metadata.
+Used for receipt upload, Gemini AI extraction, and receipt metadata. The scan endpoint does not create an expense automatically; the frontend asks the user to review and confirm first.
 
 ## Notifications
 
@@ -137,4 +137,3 @@ Base path:
 ```
 
 Used for workspace and system activity history.
-
